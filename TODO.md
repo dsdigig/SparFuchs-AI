@@ -1,8 +1,11 @@
-# TODO
+# TODO - NexLedger AI (المجلد الرئيسي فقط)
 
-- [ ] تحديث src/script.js لتحويل CRUD من Supabase إلى IndexedDB.
-- [ ] تطبيق نهج Rollback: عند فشل IndexedDB لا يتعطل التطبيق (console.error فقط) + fallback إلى localStorage.
-- [ ] إنشاء دوال parallel داخل نفس الـ scope: `saveInvoice()` و `loadInvoices()`.
-- [ ] الحفاظ على DOM IDs وعدم تعديل HTML/CSS.
-- [ ] اختبار يدوي: إضافة/تعديل/حذف + محاكاة قفل الشهر + التصدير يجب أن يعمل.
+- [x] مراجعة index.html للتأكد من ربط script.js و style.css من المجلد الرئيسي.
+- [x] دمج/توحيد منطق التصدير PDF و PNG داخل script.js (المجلد الرئيسي فقط) وربطها بأزرار download-pdf-btn و download-png-btn.
+
+- [x] التأكد أن style.css لا يسبب تعارض بإخفاء أزرار التصدير الصحيحة.
+
+- [x] عدم تعديل أي ملفات داخل dist.
+- [x] تحديث TODO عند اكتمال الخطوات.
+
 

@@ -236,6 +236,7 @@ document.addEventListener("DOMContentLoaded", () => {
         formDate: document.getElementById("form-date"),
         simulateMonthChangeBtn: document.getElementById("simulate-month-change-btn"),
         exportPngBtn: document.getElementById("export-png-btn"),
+        downloadPdfBtn: document.getElementById("download-pdf-btn"),
         exportDataBtn: document.getElementById("export-data-btn"),
         importDataBtn: document.getElementById("import-data-btn"),
         importDataInput: document.getElementById("import-data-input"),
@@ -862,6 +863,121 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
+    // =========================================
+    // Export Table To PDF (html2pdf.js)
+    // =========================================
+    function exportToPDF(options = {}) {
+        // تحديد ID الجدول المطلوب تصديره
+        const tableId = options.tableId || 'receipts-table';
+
+        // تحديد اسم الملف الناتج
+        const fileName = options.fileName || 'SparFuchs-Invoices.pdf';
+
+        // جلب عنصر الجدول من الصفحة
+        const tableEl = document.getElementById(tableId);
+
+        // إذا لم يوجد الجدول نوقف العملية برسالة
+        if (!tableEl) {
+            const msg = document.documentElement.getAttribute('lang') === 'en'
+                ? 'Table not found for PDF export.'
+                : 'لم يتم العثور على الجدول للتصدير إلى PDF.';
+            return alert(msg);
+        }
+
+        // التأكد أن مكتبة html2pdf.js محمّلة
+        if (typeof html2pdf === 'undefined') {
+            const msg = document.documentElement.getAttribute('lang') === 'en'
+                ? 'html2pdf.js library not loaded.'
+                : 'مكتبة html2pdf غير محمّلة.';
+            return alert(msg);
+        }
+
+        // تحديد حاوية الجدول (للتعامل مع overflow/responsive بدون التأثير على الواجهة)
+        const wrapperEl = tableEl.closest('.table-wrapper-container') || tableEl.parentElement;
+
+        // حفظ قيم styles الحالية لإرجاعها بعد التصدير
+        const originalWrapperOverflow = wrapperEl ? wrapperEl.style.overflow : '';
+        const originalWrapperWidth = wrapperEl ? wrapperEl.style.width : '';
+
+        const originalTableOverflow = tableEl.style.overflow;
+        const originalTableDisplay = tableEl.style.display;
+        const originalTableWidth = tableEl.style.width;
+
+        // تجهيز متغير لإرجاع styles
+        const restoreStyles = () => {
+            if (wrapperEl) {
+                wrapperEl.style.overflow = originalWrapperOverflow;
+                wrapperEl.style.width = originalWrapperWidth;
+            }
+            tableEl.style.overflow = originalTableOverflow;
+            tableEl.style.display = originalTableDisplay;
+            tableEl.style.width = originalTableWidth;
+        };
+
+        try {
+            // جعل الحاوية مرئية أثناء التصدير حتى لا يحدث قص للأعمدة
+            if (wrapperEl) {
+                wrapperEl.style.overflow = 'visible';
+                wrapperEl.style.width = 'auto';
+            }
+
+            // إجبار الجدول ليظهر كـ table وبعرض كامل
+            tableEl.style.overflow = 'visible';
+            tableEl.style.display = 'table';
+            tableEl.style.width = '100%';
+
+            // إنشاء تحويل html -> PDF
+            // ملاحظة دعم العربية: لديك already html[dir="rtl"], والـ CSS يستخدم نفس اتجاه الصفحة
+            // لذلك html2pdf سيأخذ layout المناسب
+            html2pdf()
+                .set({
+                    margin: [10, 10, 10, 10],
+                    filename: fileName,
+                    image: { type: 'jpeg', quality: 0.98 },
+                    html2canvas: {
+                        scale: 2,
+                        letterRendering: true,
+                        useCORS: true,
+                        // تحديد خلفية ثابتة لتقليل مشاكل dark mode داخل canvas
+                        backgroundColor: document.body.classList.contains('dark-mode') ? '#161920' : '#ffffff'
+                    },
+                    jsPDF: {
+                        unit: 'mm',
+                        format: 'a4',
+                        orientation: 'landscape' // تقليل احتمال اقتطاع الأعمدة
+                    },
+                    pagebreak: {
+                        // محاولة تجنب كسر الجدول/الصفوف بشكل يقطع أعمدة
+                        mode: ['avoid-all', 'css', 'legacy']
+                    }
+                })
+                .from(tableEl)
+                .save()
+                .then(() => {
+                    // بعد نجاح الحفظ، نرجع الواجهة كما كانت
+                    restoreStyles();
+                })
+                .catch((err) => {
+                    // في حال الخطأ نرجع styles
+                    console.error('exportToPDF error:', err);
+                    restoreStyles();
+                    const msg = document.documentElement.getAttribute('lang') === 'en'
+                        ? 'Failed to export PDF.'
+                        : 'فشل تصدير PDF.';
+                    alert(msg);
+                });
+
+        } catch (err) {
+            // في حال أي خطأ غير متوقع نرجع styles
+            console.error('exportToPDF unexpected error:', err);
+            restoreStyles();
+            const msg = document.documentElement.getAttribute('lang') === 'en'
+                ? 'Failed to export PDF.'
+                : 'فشل تصدير PDF.';
+            alert(msg);
+        }
+    }
+
     if (selectors.exportPngBtn) {
         selectors.exportPngBtn.addEventListener('click', () => {
             const targetArea = document.getElementById('repaint-boundary-area');
@@ -876,6 +992,82 @@ document.addEventListener("DOMContentLoaded", () => {
                 link.href = canvas.toDataURL('image/png');
                 link.click();
             });
+        });
+    }
+
+    // ربط زر تحميل PDF
+    if (selectors.downloadPdfBtn) {
+        selectors.downloadPdfBtn.addEventListener('click', () => {
+            exportToPDF({ tableId: 'receipts-table' });
+        });
+    }
+
+    // =========================================
+    // Export Table To PNG (html2canvas)
+    // =========================================
+    function exportToPNG(options = {}) {
+        // تحديد ID الجدول المطلوب تصديره
+        const tableId = options.tableId || 'receipts-table';
+
+        // تحديد اسم الملف الناتج
+        const fileName = options.fileName || 'SparFuchs-Report.png';
+
+        // جلب عنصر الجدول من الصفحة
+        const tableEl = document.getElementById(tableId);
+        if (!tableEl) {
+            const msg = document.documentElement.getAttribute('lang') === 'en'
+                ? 'Table not found for PNG export.'
+                : 'لم يتم العثور على الجدول للتصدير إلى صورة.';
+            return alert(msg);
+        }
+
+        // تأكد أن مكتبة html2canvas متاحة
+        if (typeof html2canvas === 'undefined') {
+            const msg = document.documentElement.getAttribute('lang') === 'en'
+                ? 'html2canvas library not loaded.'
+                : 'مكتبة html2canvas غير محمّلة.';
+            return alert(msg);
+        }
+
+        // نستخدم wrapper الخاص بالجدول لضمان التقاط كامل الأعمدة بدون القص بسبب overflow-x
+        const wrapperEl = tableEl.closest('.table-wrapper-container') || tableEl.parentElement;
+
+        // حفظ قيم styles الحالية (حتى لا تتأثر الواجهة)
+        const originalOverflow = wrapperEl ? wrapperEl.style.overflow : '';
+
+        try {
+            // اجعل الحاوية مرئية وقت الالتقاط
+            if (wrapperEl) {
+                wrapperEl.style.overflow = 'visible';
+            }
+
+            return html2canvas(wrapperEl || tableEl, {
+                backgroundColor: document.body.classList.contains('dark-mode') ? '#161920' : '#ffffff',
+                scale: 2,
+                useCORS: true
+            }).then((canvas) => {
+                const link = document.createElement('a');
+                link.download = fileName;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            }).finally(() => {
+                if (wrapperEl) wrapperEl.style.overflow = originalOverflow;
+            });
+        } catch (err) {
+            console.error('exportToPNG error:', err);
+            if (wrapperEl) wrapperEl.style.overflow = originalOverflow;
+            const msg = document.documentElement.getAttribute('lang') === 'en'
+                ? 'Failed to export PNG.'
+                : 'فشل تصدير الصورة.';
+            alert(msg);
+        }
+    }
+
+    // ربط زر تحميل PNG
+    const downloadPngBtn = document.getElementById('download-png-btn');
+    if (downloadPngBtn) {
+        downloadPngBtn.addEventListener('click', () => {
+            exportToPNG({ tableId: 'receipts-table' });
         });
     }
 
