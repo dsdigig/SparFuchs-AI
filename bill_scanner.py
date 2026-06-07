@@ -32,6 +32,76 @@ def encode_image_to_base64(image, quality=70, max_width=1024):
     return base64.b64encode(buffer).decode('utf-8')
 
 
+def get_bill_data_from_ocr_space_from_image(image, api_key=None, language='ara', is_table=True, timeout=30, retries=3):
+    """
+    إرسال صورة إلى خدمة OCR.Space وإرجاع النص المستخرج بشكل منظم.
+
+    المعاملات:
+    - image: مصفوفة numpy (BGR) كما يتم الحصول عليها من OpenCV.
+    - api_key: مفتاح API اختياري، سيتم قراءته من متغير البيئة `OCR_SPACE_API_KEY` إذا لم يُمرر.
+    - language: رمز اللغة (الافتراضي 'ara').
+    - is_table: حاول استخراج جداول إن وُجدت.
+    - timeout: زمن الانتظار للطلب بالثواني.
+    - retries: عدد محاولات إعادة المحاولة عند أخطاء مؤقتة.
+
+    تُعيد dict يحتوي على أحد المفاتيح: `text` أو `error`، و`full` للاستجابة الخام.
+    """
+    api_key = api_key or os.getenv('OCR_SPACE_API_KEY', '').strip()
+    if not api_key:
+        return {'error': 'OCR.Space API key not set. Set OCR_SPACE_API_KEY env var or pass api_key.'}
+
+    # تحويل الصورة إلى JPEG bytes
+    encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 70]
+    success, buffer = cv2.imencode('.jpg', image, encode_param)
+    if not success:
+        return {'error': 'Failed to encode image to JPEG'}
+
+    img_bytes = buffer.tobytes()
+
+    files = {'file': ('bill.jpg', img_bytes, 'image/jpeg')}
+    payload = {
+        'apikey': api_key,
+        'language': language,
+    }
+    if is_table:
+        payload['isTable'] = True
+
+    # جلسة مع سياسات إعادة المحاولة
+    session = requests.Session()
+    try:
+        from requests.adapters import HTTPAdapter
+        from urllib3.util.retry import Retry
+
+        retry_strategy = Retry(
+            total=retries,
+            backoff_factor=1,
+            status_forcelist=[429, 500, 502, 503, 504],
+            allowed_methods=["POST"],
+        )
+        adapter = HTTPAdapter(max_retries=retry_strategy)
+        session.mount("https://", adapter)
+        session.mount("http://", adapter)
+    except Exception:
+        # إذا لم تتوفر urllib3 أو فشلت الإعدادات، نتابع بدون retries المخصصة
+        pass
+
+    api_url = "https://api.ocr.space/parse/image"
+    try:
+        resp = session.post(api_url, files=files, data=payload, timeout=timeout)
+        resp.raise_for_status()
+        result = resp.json()
+
+        if result.get("IsErroredOnProcessing") == False:
+            parsed = result.get('ParsedResults') or []
+            text = parsed[0].get('ParsedText') if parsed else ''
+            return {'text': text, 'full': result}
+        else:
+            return {'error': result.get('ErrorMessage') or 'OCR processing error', 'full': result}
+
+    except Exception as e:
+        return {'error': str(e)}
+
+
 def process_bill_with_vision_ai(image):
     """إرسال الصورة مع الأمر إلى واجهة الـ OpenAI (Chat Completions).
     ملاحظة: هذه دالة عامة وتعمل مع واجهات الـ Chat التقليدية.
