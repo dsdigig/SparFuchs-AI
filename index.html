@@ -59,6 +59,39 @@
             <button id="empty-add-btn" class="empty-action-btn lang-text" data-en="Add your first receipt" data-ar="أضف إيصالك الأول">أضف إيصالك الأول</button>
         </div>
 
+        <!-- Scanned result card: populated dynamically after AI extraction -->
+        <div id="scanned-result-card" class="scanned-result-card" hidden aria-live="polite">
+            <div class="scanned-card-header">
+                <div>
+                    <div class="scanned-store" id="scanned-store">---</div>
+                    <div class="scanned-meta" id="scanned-meta">---</div>
+                </div>
+                <div class="scanned-actions">
+                    <button id="hide-scanned-result" class="action-btn" aria-label="أغلق النتيجة">✕</button>
+                </div>
+            </div>
+
+            <div class="scanned-items-wrapper">
+                <table class="scanned-table" role="table" aria-label="Scanned invoice items">
+                    <thead>
+                        <tr>
+                            <th class="lang-text" data-en="Item" data-ar="الوصف">الوصف</th>
+                            <th class="lang-text" data-en="Qty" data-ar="الكمية">الكمية</th>
+                            <th class="lang-text" data-en="Unit" data-ar="سعر الوحدة">سعر الوحدة</th>
+                            <th class="lang-text" data-en="Total" data-ar="المجموع">المجموع</th>
+                        </tr>
+                    </thead>
+                    <tbody id="scanned-items-tbody">
+                        <!-- Populated by script.js -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="scanned-summary">
+                <div id="scanned-total" class="scanned-total">المجموع: —</div>
+            </div>
+        </div>
+
         <div class="recent-list-container" id="recent-receipts-list"></div>
     </div>
 

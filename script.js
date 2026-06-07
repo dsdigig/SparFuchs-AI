@@ -317,6 +317,69 @@
             if (region) region.style.display = '';
         }
 
+    // Render the scanned result into the main UI card (not the modal)
+    function renderScannedResult(data) {
+        try {
+            const card = document.getElementById('scanned-result-card');
+            const storeEl = document.getElementById('scanned-store');
+            const metaEl = document.getElementById('scanned-meta');
+            const tbody = document.getElementById('scanned-items-tbody');
+            const totalEl = document.getElementById('scanned-total');
+            if (!card || !tbody) return;
+
+            // Basic fields
+            storeEl.textContent = data.bill_name || (data.name || '---');
+            metaEl.textContent = (data.date ? data.date + ' · ' : '') + (data.currency ? data.currency : '');
+
+            // Populate items table
+            tbody.innerHTML = '';
+            if (Array.isArray(data.items) && data.items.length) {
+                data.items.forEach(it => {
+                    const tr = document.createElement('tr');
+                    const tdName = document.createElement('td');
+                    const tdQty = document.createElement('td');
+                    const tdUnit = document.createElement('td');
+                    const tdTotal = document.createElement('td');
+
+                    tdName.textContent = it.name || '';
+                    tdQty.textContent = (typeof it.quantity !== 'undefined' && it.quantity !== null) ? String(it.quantity) : '';
+                    tdUnit.textContent = (typeof it.unit_price !== 'undefined' && it.unit_price !== null) ? Number(it.unit_price).toFixed(2) : '';
+                    tdTotal.textContent = (typeof it.total_price !== 'undefined' && it.total_price !== null) ? Number(it.total_price).toFixed(2) : '';
+
+                    tdName.style.padding = '10px'; tdName.style.textAlign = 'right';
+                    tdQty.style.padding = '10px'; tdQty.style.textAlign = 'center';
+                    tdUnit.style.padding = '10px'; tdUnit.style.textAlign = 'center';
+                    tdTotal.style.padding = '10px'; tdTotal.style.textAlign = 'left';
+
+                    tr.appendChild(tdName);
+                    tr.appendChild(tdQty);
+                    tr.appendChild(tdUnit);
+                    tr.appendChild(tdTotal);
+                    tbody.appendChild(tr);
+                });
+            } else {
+                const tr = document.createElement('tr');
+                const td = document.createElement('td');
+                td.setAttribute('colspan', '4');
+                td.style.textAlign = 'center'; td.style.padding = '12px'; td.style.color = 'var(--text-muted)';
+                td.textContent = 'لم يتم التعرف على بنود مخصّصة.';
+                tr.appendChild(td);
+                tbody.appendChild(tr);
+            }
+
+            // total
+            const sum = Array.isArray(data.items) ? data.items.reduce((s,it) => s + (Number(it.total_price) || 0), 0) : (Number(data.total_amount) || 0);
+            if (totalEl) totalEl.textContent = 'المجموع: ' + Number(sum).toFixed(2) + ' ' + (data.currency || '');
+
+            card.hidden = false;
+
+            // hide handler
+            const hideBtn = document.getElementById('hide-scanned-result');
+            if (hideBtn) hideBtn.addEventListener('click', () => { card.hidden = true; });
+
+        } catch (e) { console.warn('renderScannedResult error', e); }
+    }
+
     // When user picks/captures an image via native input, convert immediately to Base64
     if (selectors.scanInvoiceFileInput) {
         selectors.scanInvoiceFileInput.addEventListener('change', async (ev) => {
@@ -946,8 +1009,10 @@
                     // Render dynamic items if present
                     if (Array.isArray(final.items) && final.items.length) {
                         renderInvoiceItems(final.items);
+                        try { renderScannedResult(final); } catch(e) { console.warn('scanned card render failed', e); }
                     } else {
                         clearInvoiceItems();
+                        try { renderScannedResult(final); } catch(e) { console.warn('scanned card render failed', e); }
                     }
 
                     showOcrMessage(isEn ? 'AI result applied.' : 'تم تطبيق نتيجة الذكاء الاصطناعي.');

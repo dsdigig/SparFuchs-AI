@@ -398,6 +398,27 @@ body {
     width: 100%;
 }
 
+/* Scanned result card (AI-extracted invoice) - RTL friendly and responsive */
+.scanned-result-card {
+    margin: 16px; padding: 14px; border-radius: 12px; background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.02));
+    border: 1px solid var(--table-border); box-shadow: 0 8px 28px rgba(0,0,0,0.08); color: inherit;
+}
+.scanned-card-header { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:8px; }
+.scanned-store { font-weight:800; font-size:16px; }
+.scanned-meta { color: var(--text-muted); font-size:13px; margin-top:4px; }
+.scanned-items-wrapper { overflow-x:auto; margin-top:8px; }
+.scanned-table { width:100%; border-collapse:collapse; font-size:14px; text-align:right; }
+.scanned-table th, .scanned-table td { padding:10px; border:1px solid var(--table-border); }
+.scanned-table thead th { background: rgba(0,0,0,0.04); font-weight:700; }
+.scanned-summary { margin-top:10px; display:flex; justify-content:flex-start; }
+.scanned-total { font-weight:800; }
+
+@media (max-width: 680px) {
+    .scanned-result-card { padding: 10px; margin: 12px; }
+    .scanned-store { font-size:14px; }
+    .scanned-table th, .scanned-table td { padding:8px; font-size:13px; }
+}
+
 .main-card,
 .section-title-bar,
 .recent-list-container,
