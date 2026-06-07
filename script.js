@@ -1,4 +1,4 @@
-document.addEventListener("DOMContentLoaded", () => {
+﻿document.addEventListener("DOMContentLoaded", () => {
 
     console.log('Script loaded successfully');
 
@@ -212,6 +212,9 @@ document.addEventListener("DOMContentLoaded", () => {
         navItems: document.querySelectorAll(".bottom-nav .nav-item"),
         screens: document.querySelectorAll(".screen"),
         cameraOverlay: document.getElementById("screen-camera-view"),
+        cameraVideo: document.getElementById("camera-video"),
+        cameraCanvas: document.getElementById("camera-canvas"),
+        captureCameraBtn: document.getElementById("capture-camera-btn"),
         triggerOcrBtn: document.getElementById("trigger-ocr-btn"),
         closeCameraBtn: document.getElementById("close-camera-btn"),
         tableBody: document.getElementById("table-body"),
@@ -235,8 +238,9 @@ document.addEventListener("DOMContentLoaded", () => {
         formCategory: document.getElementById("form-category"),
         formDate: document.getElementById("form-date"),
         simulateMonthChangeBtn: document.getElementById("simulate-month-change-btn"),
-        exportPngBtn: document.getElementById("export-png-btn"),
         downloadPdfBtn: document.getElementById("download-pdf-btn"),
+        scanInvoiceBtn: document.getElementById("scan-invoice-btn"),
+        scanInvoiceFileInput: document.getElementById("scan-invoice-file-input"),
         exportDataBtn: document.getElementById("export-data-btn"),
         importDataBtn: document.getElementById("import-data-btn"),
         importDataInput: document.getElementById("import-data-input"),
@@ -245,6 +249,134 @@ document.addEventListener("DOMContentLoaded", () => {
         langRadios: document.querySelectorAll('input[name="language"]'),
         clearDataBtn: document.getElementById("clear-data-btn")
     };
+
+    // additional controls (search / filters) - may be null on first load
+    selectors.tableSearch = document.getElementById('table-search');
+    selectors.filterMonth = document.getElementById('filter-month');
+    selectors.filterCurrency = document.getElementById('filter-currency');
+
+    // Hook empty-state add button to existing manual add action (UI-only)
+    (function hookEmptyAddBtn(){
+        const emptyBtn = document.getElementById('empty-add-btn');
+        if (!emptyBtn) return;
+        emptyBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            // prefer manual add (fastManualBtn) then OCR
+            if (selectors.fastManualBtn && typeof selectors.fastManualBtn.click === 'function') selectors.fastManualBtn.click();
+            else if (selectors.triggerOcrBtn && typeof selectors.triggerOcrBtn.click === 'function') selectors.triggerOcrBtn.click();
+        });
+    })();
+
+        // ------------------ Stats population (uses existing invoicesDatabase) ------------------
+        let _statsChart = null;
+        function populateStats() {
+            const data = Array.isArray(invoicesDatabase) ? invoicesDatabase.slice() : [];
+            const totalCount = data.length;
+            const totalUSD = data.filter(i=>i.currency==='$').reduce((s,i)=>s+i.amount,0);
+            const totalSYP = data.filter(i=>i.currency==='ل.س').reduce((s,i)=>s+i.amount,0);
+
+            // busiest month (by count)
+            const monthMap = {};
+            data.forEach(i=>{ monthMap[i.monthBucket] = (monthMap[i.monthBucket]||0)+1; });
+            const busiest = Object.keys(monthMap).sort((a,b)=>monthMap[b]-monthMap[a])[0] || '-';
+
+            // top currency
+            const currencyMap = {};
+            data.forEach(i=>{ currencyMap[i.currency] = (currencyMap[i.currency]||0)+1; });
+            const topCurrency = Object.keys(currencyMap).sort((a,b)=>currencyMap[b]-currencyMap[a])[0] || '-';
+
+            const langIsEn = document.documentElement.getAttribute('lang') === 'en';
+            const totalText = `$${totalUSD.toFixed(2)} / ${totalSYP.toLocaleString()} ل.س`;
+
+            const elInvoices = document.getElementById('stat-invoices'); if (elInvoices) elInvoices.textContent = totalCount;
+            const elTotal = document.getElementById('stat-total'); if (elTotal) elTotal.textContent = totalText;
+            const elBusiest = document.getElementById('stat-busiest'); if (elBusiest) elBusiest.textContent = busiest;
+            const elCurrency = document.getElementById('stat-currency'); if (elCurrency) elCurrency.textContent = topCurrency;
+
+            // Chart.js if available: show invoices per month
+            if (typeof Chart !== 'undefined' && document.getElementById('stats-chart')) {
+                const groups = {};
+                data.forEach(i=> { groups[i.monthBucket] = (groups[i.monthBucket]||0)+1; });
+                const months = Object.keys(groups).sort((a,b)=> new Date(a.split(' ').slice(0,2).join(' 1, ')) - new Date(b.split(' ').slice(0,2).join(' 1, ')));
+                const counts = months.map(m=>groups[m]);
+                const ctx = document.getElementById('stats-chart').getContext('2d');
+                try {
+                    if (_statsChart) _statsChart.destroy();
+                } catch(e){}
+                _statsChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: months,
+                        datasets: [{ label: langIsEn ? 'Invoices' : 'الإيصالات', data: counts, borderColor: 'rgba(34,197,94,0.9)', backgroundColor: 'rgba(34,197,94,0.12)', fill: true, tension: 0.3 }]
+                    },
+                    options: { responsive: true, plugins: { legend: { display: false } } }
+                });
+            }
+        }
+
+    // === Enhanced amount input UX (formatting + validation, UI-only) ===
+    (function enhanceAmountInput() {
+        const amt = selectors.formAmount;
+        if (!amt) return;
+        // ensure mobile numeric keyboard
+        try { amt.setAttribute('inputmode', 'decimal'); } catch(e){}
+        amt.dataset.rawValue = amt.value || '';
+
+        function formatForDisplay(raw) {
+            if (!raw && raw !== 0) return '';
+            const n = String(raw);
+            const parts = n.split('.');
+            const intPart = parts[0].replace(/^0+(?=\d)|[^0-9]/g, '') || '0';
+            const dec = parts[1] ? parts[1].slice(0,2) : null;
+            const withSep = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+            return dec != null ? withSep + '.' + dec : withSep;
+        }
+
+        amt.addEventListener('keydown', (e) => {
+            if (e.ctrlKey || e.metaKey) return;
+            const allowed = ['Backspace','Tab','ArrowLeft','ArrowRight','Delete','Home','End'];
+            if (allowed.includes(e.key)) return;
+            // accept western digits, Arabic-Indic and Eastern Arabic digits, and decimal separators
+            const isDigit = /[0-9\u0660-\u0669\u06F0-\u06F9]/.test(e.key);
+            const isDecimal = e.key === '.' || e.key === ',' || e.key === '\u066b' || e.key === '\u066c';
+            if (isDecimal) {
+                if (amt.value.includes('.') || amt.value.includes(',') || amt.value.includes('\u066b') || amt.value.includes('\u066c')) e.preventDefault();
+                return;
+            }
+            if (!isDigit) e.preventDefault();
+        });
+
+        amt.addEventListener('input', () => {
+            // normalize Arabic/Persian digits and separators first
+            const normalizedDigits = normalizeOcrDigits(amt.value || '');
+            const raw = String(normalizedDigits)
+                .replace(/[^0-9.,]/g, '')
+                .replace(/,/g, '.');
+            const parts = raw.split('.');
+            const intPart = parts.shift() || '';
+            const decPart = parts.join('').slice(0,2);
+            const normalized = decPart ? intPart + '.' + decPart : intPart;
+            amt.dataset.rawValue = normalized;
+            amt.value = formatForDisplay(normalized);
+        });
+
+        amt.addEventListener('focus', () => {
+            // show raw for easier editing
+            amt.value = String(amt.dataset.rawValue || '').replace(/,/g, '.');
+        });
+
+        amt.addEventListener('blur', () => {
+            const raw = amt.dataset.rawValue || amt.value.replace(/,/g, '.');
+            const num = parseFloat(String(raw || '').replace(/,/g, ''));
+            if (Number.isFinite(num)) {
+                amt.dataset.rawValue = num.toFixed(2);
+                amt.value = Number(num).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+            } else {
+                amt.dataset.rawValue = '';
+                amt.value = '';
+            }
+        });
+    })();
 
     function safeParseJSON(value, fallback) {
 
@@ -285,31 +417,153 @@ document.addEventListener("DOMContentLoaded", () => {
                     screen.classList.toggle("active", screen.id === targetScreen);
                 });
             });
+            // keyboard activation (Enter / Space) for accessibility
+            item.addEventListener('keydown', (ev) => {
+                if (ev.key === 'Enter' || ev.key === ' ') {
+                    ev.preventDefault();
+                    item.click();
+                }
+            });
         });
     }
 
-    // 2. OCR mock
+    let cameraStream = null;
+
+    function stopCameraStream() {
+        if (cameraStream) {
+            cameraStream.getTracks().forEach(track => track.stop());
+            cameraStream = null;
+        }
+        if (selectors.cameraVideo) {
+            selectors.cameraVideo.pause();
+            selectors.cameraVideo.srcObject = null;
+        }
+        if (selectors.cameraOverlay) selectors.cameraOverlay.style.display = 'none';
+    }
+
+    async function openCameraScanner() {
+        const isEn = document.documentElement.getAttribute('lang') === 'en';
+        if (isCurrentMonthLocked) {
+            alert(isEn ? 'This month is locked.' : 'تم قفل جدول الشهر الحالي تلقائياً.');
+            return;
+        }
+
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            if (selectors.scanInvoiceFileInput) {
+                selectors.scanInvoiceFileInput.value = '';
+                selectors.scanInvoiceFileInput.click();
+            }
+            return;
+        }
+
+        try {
+            if (selectors.cameraOverlay) selectors.cameraOverlay.style.display = 'flex';
+            showOcrMessage(isEn ? 'Starting camera...' : 'جاري تشغيل الكاميرا...');
+            cameraStream = await navigator.mediaDevices.getUserMedia({
+                video: {
+                    facingMode: { ideal: 'environment' },
+                    width: { ideal: 1920 },
+                    height: { ideal: 1080 }
+                },
+                audio: false
+            });
+
+            if (selectors.cameraVideo) {
+                selectors.cameraVideo.srcObject = cameraStream;
+                await selectors.cameraVideo.play();
+            }
+            showOcrMessage(isEn ? 'Align the invoice and capture.' : 'وجّه الكاميرا نحو الفاتورة ثم التقط الصورة.');
+        } catch (e) {
+            console.error('Camera permission/start failed:', e);
+            stopCameraStream();
+            if (selectors.scanInvoiceFileInput) {
+                selectors.scanInvoiceFileInput.value = '';
+                selectors.scanInvoiceFileInput.click();
+            } else {
+                alert(isEn ? 'Camera is unavailable or permission was denied.' : 'الكاميرا غير متاحة أو تم رفض الصلاحية.');
+            }
+        }
+    }
+
+    async function captureCameraFrame() {
+        const video = selectors.cameraVideo;
+        const canvas = selectors.cameraCanvas;
+        if (!video || !canvas || !video.videoWidth || !video.videoHeight) return;
+
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        showOcrMessage(document.documentElement.getAttribute('lang') === 'en' ? 'Captured. Processing...' : 'تم الالتقاط. جاري التحليل...');
+        canvas.toBlob(async (blob) => {
+            stopCameraStream();
+            if (blob) await processInvoice(blob);
+        }, 'image/jpeg', 0.95);
+    }
+
+    // 2. Camera + OCR
+    function isMobileDevice() {
+        try {
+            return window.matchMedia('(pointer:coarse)').matches || /Mobi|Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
+        } catch { return false; }
+    }
+
     if (selectors.triggerOcrBtn) {
         selectors.triggerOcrBtn.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
-            if (isCurrentMonthLocked) {
-                alert("هذا الشهر انتهى وتم قفله تلقائياً، يرجى بدء شهر مالي جديد لإضافة فواتير.");
-                return;
+            // On mobile open camera directly; on desktop open file picker
+            if (isMobileDevice()) {
+                openCameraScanner();
+            } else {
+                if (selectors.scanInvoiceFileInput) {
+                    selectors.scanInvoiceFileInput.value = '';
+                    selectors.scanInvoiceFileInput.click();
+                } else {
+                    // fallback
+                    openCameraScanner();
+                }
             }
-            if(selectors.cameraOverlay) selectors.cameraOverlay.style.display = 'flex';
-            setTimeout(() => {
-                if(selectors.cameraOverlay) selectors.cameraOverlay.style.display = 'none';
-                executeGoogleMLKitOCR();
-            }, 2000);
         });
     }
 
     if (selectors.closeCameraBtn) {
         selectors.closeCameraBtn.addEventListener('click', () => {
-            if(selectors.cameraOverlay) selectors.cameraOverlay.style.display = 'none';
+            stopCameraStream();
         });
     }
+
+    if (selectors.captureCameraBtn) {
+        selectors.captureCameraBtn.addEventListener('click', captureCameraFrame);
+    }
+
+    // small ripple effect for camera buttons (visual only)
+    function attachRipple(el) {
+        if (!el) return;
+        el.addEventListener('click', (ev) => {
+            const rect = el.getBoundingClientRect();
+            const ripple = document.createElement('span');
+            ripple.className = 'ripple-effect-temp';
+            ripple.style.position = 'absolute';
+            ripple.style.borderRadius = '50%';
+            ripple.style.pointerEvents = 'none';
+            ripple.style.width = ripple.style.height = Math.max(rect.width, rect.height) + 'px';
+            ripple.style.left = (ev.clientX - rect.left - rect.width/2) + 'px';
+            ripple.style.top = (ev.clientY - rect.top - rect.height/2) + 'px';
+            ripple.style.background = 'rgba(255,255,255,0.12)';
+            ripple.style.transform = 'scale(0)';
+            ripple.style.transition = 'transform 400ms ease-out, opacity 400ms ease-out';
+            ripple.style.zIndex = '9999';
+            el.style.position = el.style.position || 'relative';
+            el.appendChild(ripple);
+            requestAnimationFrame(() => { ripple.style.transform = 'scale(2)'; ripple.style.opacity = '0'; });
+            setTimeout(() => { try { ripple.remove(); } catch{} }, 500);
+        });
+    }
+
+    attachRipple(selectors.triggerOcrBtn);
+    attachRipple(selectors.captureCameraBtn);
 
     function executeGoogleMLKitOCR() {
         // Keeping existing mock OCR behavior as fallback for the camera overlay.
@@ -343,6 +597,94 @@ document.addEventListener("DOMContentLoaded", () => {
         if (selectors.ocrLoaderText) selectors.ocrLoaderText.textContent = msg;
     }
 
+    function normalizeOcrDigits(value) {
+        const arabic = '٠١٢٣٤٥٦٧٨٩';
+        const persian = '۰۱۲۳۴۵۶۷۸۹';
+        return String(value || '')
+            .replace(/[٠-٩]/g, d => String(arabic.indexOf(d)))
+            .replace(/[۰-۹]/g, d => String(persian.indexOf(d)))
+            .replace(/\u066b/g, '.')
+            .replace(/\u066c/g, ',');
+    }
+
+    function parseOcrAmount(value) {
+        const cleaned = normalizeOcrDigits(value)
+            .replace(/[^\d.,]/g, '')
+            .replace(/,(?=\d{3}\b)/g, '')
+            .replace(/,/g, '.');
+        const amount = parseFloat(cleaned);
+        return Number.isFinite(amount) ? amount : null;
+    }
+
+    function normalizeOcrDate(value) {
+        const raw = normalizeOcrDigits(value).trim().replace(/[/.]/g, '-');
+        const parts = raw.split('-').filter(Boolean);
+        if (parts.length !== 3) return new Date().toISOString().split('T')[0];
+
+        let y;
+        let m;
+        let d;
+        if (parts[0].length === 4) {
+            [y, m, d] = parts;
+        } else {
+            [d, m, y] = parts;
+        }
+
+        if (String(y).length === 2) y = `20${y}`;
+        return `${String(y).padStart(4, '0')}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    }
+
+    function extractInvoiceDataFromText(text) {
+        const normalizedText = normalizeOcrDigits(text);
+        const lines = normalizedText
+            .split(/\r?\n/)
+            .map(line => line.trim())
+            .filter(line => line.length > 1);
+
+        const ignoredNameWords = /total|amount|date|invoice|receipt|tax|vat|cash|visa|subtotal|balance|المجموع|الإجمالي|اجمالي|ضريبة|فاتورة|تاريخ|نقد/i;
+        const name = (lines.find(line => /[A-Za-z\u0600-\u06FF]/.test(line) && !ignoredNameWords.test(line)) || lines[0] || 'Scanned Invoice').slice(0, 80);
+
+        const dateMatch = normalizedText.match(/\b(?:\d{4}[-/.]\d{1,2}[-/.]\d{1,2}|\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4})\b/);
+        const date = dateMatch ? normalizeOcrDate(dateMatch[0]) : new Date().toISOString().split('T')[0];
+
+        const currency = /(\$|usd|dollar)/i.test(normalizedText) ? '$' : 'ل.س';
+        const amountCandidates = [];
+        const amountRegex = /(?:total|amount|grand|net|المجموع|الإجمالي|اجمالي|المبلغ)[^\d٠-٩۰-۹]{0,16}([\d٠-٩۰-۹][\d٠-٩۰-۹.,٬٫ ]*)/gi;
+        let match;
+        while ((match = amountRegex.exec(normalizedText)) !== null) {
+            const value = parseOcrAmount(match[1]);
+            if (value !== null) amountCandidates.push(value);
+        }
+        if (!amountCandidates.length) {
+            const looseAmounts = normalizedText.match(/[\d٠-٩۰-۹]{1,3}(?:[,\u066c ]?[\d٠-٩۰-۹]{3})*(?:[.\u066b]\d{1,2})?|\d+(?:[.\u066b]\d{1,2})?/g) || [];
+            looseAmounts.forEach(item => {
+                const value = parseOcrAmount(item);
+                if (value !== null) amountCandidates.push(value);
+            });
+        }
+
+        const amount = amountCandidates.length ? Math.max(...amountCandidates) : 0;
+        return { name, date, amount, currency, category: 'أخرى' };
+    }
+
+    function fillInvoiceReview(data) {
+        openInvoiceModalForAdd();
+        if (selectors.formName) selectors.formName.value = data.name || '';
+        if (selectors.formAmount) {
+            const num = Number(data.amount || 0);
+            if (Number.isFinite(num)) {
+                selectors.formAmount.dataset.rawValue = num.toFixed(2);
+                selectors.formAmount.value = Number(num).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+            } else {
+                selectors.formAmount.dataset.rawValue = '';
+                selectors.formAmount.value = '';
+            }
+        }
+        if (selectors.formCurrency) selectors.formCurrency.value = data.currency || '$';
+        if (selectors.formCategory) selectors.formCategory.value = data.category || 'أخرى';
+        if (selectors.formDate) selectors.formDate.value = data.date || new Date().toISOString().split('T')[0];
+    }
+
     async function processInvoice(file) {
         const isEn = document.documentElement.getAttribute('lang') === 'en';
         try {
@@ -373,11 +715,14 @@ document.addEventListener("DOMContentLoaded", () => {
             const resizedBlob = await new Promise((resolve) => canvas.toBlob(resolve, file.type || 'image/jpeg', 0.92));
             const inputForTesseract = resizedBlob || file;
 
-            const result = await Tesseract.recognize(inputForTesseract, 'eng', {
+            const result = await Tesseract.recognize(inputForTesseract, 'ara+eng', {
                 logger: () => { /* progress UI could be added later */ }
             });
 
             const text = (result && result.data && result.data.text) ? result.data.text : '';
+            fillInvoiceReview(extractInvoiceDataFromText(text));
+            showOcrMessage(isEn ? 'Done. Review extracted data.' : 'تم. راجع البيانات المستخرجة.');
+            return;
 
             // Extract total amount (supports Arabic/Western numbers with separators)
             // Examples: 1,234.56 or 1234.56 or ١٢٣٤٫٥٦
@@ -440,8 +785,11 @@ document.addEventListener("DOMContentLoaded", () => {
             (async () => {
                 try {
                     showOcrMessage(isEn ? 'Processing invoice...' : 'جاري تحليل الفاتورة...');
-                    const result = await Tesseract.recognize(file, 'eng');
+                    const result = await Tesseract.recognize(file, 'ara+eng');
                     const text = result?.data?.text || '';
+                    fillInvoiceReview(extractInvoiceDataFromText(text));
+                    showOcrMessage(isEn ? 'Done. Review extracted data.' : 'تم. راجع البيانات المستخرجة.');
+                    return;
                     const amountMatch = text.match(/([\d.,]+)(?!.*\1)/);
                     const dateMatch = text.match(/(\d{4}[-\/.]\d{1,2}[-\/.]\d{1,2})|(\d{1,2}[-\/.]\d{1,2}[-\/.]\d{4})/);
                     if (amountMatch && selectors.formAmount) selectors.formAmount.value = parseFloat(String(amountMatch[1]).replace(/,/g,'')).toFixed(2);
@@ -459,8 +807,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (selectors.scanInvoiceBtn && selectors.scanInvoiceFileInput) {
         selectors.scanInvoiceBtn.addEventListener('click', () => {
             try {
-                selectors.scanInvoiceFileInput.value = '';
-                selectors.scanInvoiceFileInput.click();
+                openCameraScanner();
             } catch (e) {
                 console.error('scan-invoice click failed:', e);
             }
@@ -487,6 +834,13 @@ document.addEventListener("DOMContentLoaded", () => {
         selectors.closeInvoiceModalBtn.addEventListener('click', () => {
             if(selectors.invoiceModal) selectors.invoiceModal.classList.remove('active');
         });
+        // allow keyboard to close modal via Enter/Space
+        selectors.closeInvoiceModalBtn.addEventListener('keydown', (ev) => {
+            if (ev.key === 'Enter' || ev.key === ' ') {
+                ev.preventDefault();
+                if(selectors.invoiceModal) selectors.invoiceModal.classList.remove('active');
+            }
+        });
     }
 
     function openInvoiceModalForAdd() {
@@ -505,7 +859,16 @@ document.addEventListener("DOMContentLoaded", () => {
         if(selectors.modalTitle) selectors.modalTitle.textContent = isEn ? 'Edit Invoice' : 'تعديل بيانات الفاتورة';
         if(selectors.formInvoiceId) selectors.formInvoiceId.value = invoice.id;
         if(selectors.formName) selectors.formName.value = invoice.name;
-        if(selectors.formAmount) selectors.formAmount.value = invoice.amount;
+        if(selectors.formAmount) {
+            const num = Number(invoice.amount || 0);
+            if (Number.isFinite(num)) {
+                selectors.formAmount.dataset.rawValue = num.toFixed(2);
+                selectors.formAmount.value = Number(num).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+            } else {
+                selectors.formAmount.dataset.rawValue = '';
+                selectors.formAmount.value = '';
+            }
+        }
         if(selectors.formCurrency) selectors.formCurrency.value = invoice.currency;
         if(selectors.formCategory) selectors.formCategory.value = invoice.category;
         if(selectors.formDate) selectors.formDate.value = invoice.date;
@@ -520,7 +883,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
             try {
                 const name = selectors.formName ? selectors.formName.value : '';
-                const amount = selectors.formAmount ? parseFloat(selectors.formAmount.value) : NaN;
+                // read raw numeric value (keeps UI formatting separate from stored numeric)
+                const rawAmount = selectors.formAmount ? (selectors.formAmount.dataset.rawValue || selectors.formAmount.value.replace(/,/g, '.')) : '';
+                const amount = selectors.formAmount ? parseFloat(String(rawAmount).replace(/,/g, '')) : NaN;
                 const currency = selectors.formCurrency ? selectors.formCurrency.value : '';
                 const category = selectors.formCategory ? selectors.formCategory.value : '';
                 const date = selectors.formDate ? selectors.formDate.value : '';
@@ -571,6 +936,50 @@ document.addEventListener("DOMContentLoaded", () => {
         if(selectors.mainBalance) selectors.mainBalance.textContent = `$${totalUSD.toFixed(2)} / ${totalSYP.toLocaleString()} ل.س`;
         if(selectors.mainFooterCount) selectors.mainFooterCount.textContent = isEn ? `${currentMonthData.length} receipts this month` : `${currentMonthData.length} إيصالات هذا الشهر`;
         if(selectors.dashboardTotalCount) selectors.dashboardTotalCount.textContent = isEn ? `total ${currentMonthData.length}` : `الإجمالي ${currentMonthData.length}`;
+
+        // KPIs (desktop tiles)
+        const totalCombinedUSD = totalUSD; // keep separate currencies explicit
+        if (document.getElementById('kpi-total')) {
+            document.getElementById('kpi-total').textContent = `$${totalUSD.toFixed(2)} / ${totalSYP.toLocaleString()} ل.س`;
+        }
+        if (document.getElementById('kpi-count')) {
+            document.getElementById('kpi-count').textContent = `${currentMonthData.length}`;
+        }
+        if (document.getElementById('kpi-avg')) {
+            const avgUSD = currentMonthData.filter(i=>i.currency==='$').reduce((s,i)=>s+i.amount,0);
+            const avgSYP = currentMonthData.filter(i=>i.currency==='ل.س').reduce((s,i)=>s+i.amount,0);
+            const avgText = currentMonthData.length ? `${(avgUSD/currentMonthData.length).toFixed(2)}$ / ${Math.round(avgSYP/currentMonthData.length).toLocaleString()} ل.س` : `$0.00 / 0 ل.س`;
+            document.getElementById('kpi-avg').textContent = avgText;
+        }
+
+        // percent change vs previous month (hide when no prev data)
+        try {
+            const parts = activeMonthBucket.split(' ');
+            const monthName = parts.slice(0, -1).join(' ') || parts[0];
+            const year = parts[parts.length-1];
+            const refDate = new Date(`${monthName} 1, ${year}`);
+            refDate.setMonth(refDate.getMonth() - 1);
+            const prevMonthBucket = refDate.toLocaleString('en', { month: 'long' }) + ' ' + refDate.getFullYear();
+            const prevData = invoicesDatabase.filter(inv => inv.monthBucket === prevMonthBucket);
+            const prevTotalUSD = prevData.filter(i=>i.currency==='$').reduce((s,i)=>s+i.amount,0);
+            const prevTotalSYP = prevData.filter(i=>i.currency==='ل.س').reduce((s,i)=>s+i.amount,0);
+            const currTotal = totalUSD + totalSYP; // coarse comparison (note: different currencies)
+            const prevTotal = prevTotalUSD + prevTotalSYP;
+            const changeEl = document.getElementById('kpi-change');
+            if (changeEl) {
+                if (!prevData.length || prevTotal === 0) {
+                    changeEl.style.display = 'none';
+                } else {
+                    const pct = ((currTotal - prevTotal) / Math.abs(prevTotal)) * 100;
+                    const sign = pct >= 0 ? '+' : '';
+                    changeEl.textContent = `${sign}${pct.toFixed(1)}%`;
+                    changeEl.style.display = 'block';
+                    changeEl.style.color = pct >=0 ? 'var(--success)' : 'var(--danger)';
+                }
+            }
+        } catch (e) {
+            // silent
+        }
     }
 
     function renderDatabaseInInterfaces() {
@@ -578,9 +987,34 @@ document.addEventListener("DOMContentLoaded", () => {
 
         updateDashboard();
 
-        const currentMonthData = invoicesDatabase.filter(inv => inv.monthBucket === activeMonthBucket);
-
         const isEn = document.documentElement.getAttribute('lang') === 'en';
+
+        // Filtering: search, month, currency
+        function getFilteredInvoices() {
+            let list = Array.isArray(invoicesDatabase) ? invoicesDatabase.slice() : [];
+            const search = selectors.tableSearch ? (selectors.tableSearch.value || '').trim().toLowerCase() : '';
+            const monthSel = selectors.filterMonth ? selectors.filterMonth.value : 'current';
+            const currencySel = selectors.filterCurrency ? selectors.filterCurrency.value : 'all';
+
+            if (monthSel && monthSel !== 'all' && monthSel !== 'current') {
+                list = list.filter(i => i.monthBucket === monthSel);
+            } else if (monthSel === 'current') {
+                list = list.filter(i => i.monthBucket === activeMonthBucket);
+            }
+
+            if (currencySel && currencySel !== 'all') {
+                list = list.filter(i => i.currency === currencySel);
+            }
+
+            if (search) {
+                list = list.filter(i => (i.name || '').toLowerCase().includes(search) || (i.category || '').toLowerCase().includes(search));
+            }
+
+            return list;
+        }
+
+        const currentMonthData = getFilteredInvoices();
+
         selectors.tableBody.innerHTML = '';
         selectors.recentReceiptsList.innerHTML = '';
 
@@ -590,11 +1024,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
             selectors.tableBody.innerHTML = `
                 <tr id="no-data-row">
-                    <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 40px;">
-                        <span>${isEn ? 'No data in this month yet' : 'لا توجد بيانات لهذا الشهر حتى الآن'}</span>
+                    <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 28px;">
+                        <img class="table-empty-illustration" src="https://cdn.phototourl.com/free/2026-06-01-illustration-empty.png" alt="empty">
+                        <div style="font-weight:700; margin-top:8px;">${isEn ? 'No invoices' : 'لا توجد فواتير'}</div>
+                        <div style="margin-top:6px; color:var(--text-muted);">${isEn ? 'Use the camera or add a manual invoice to get started.' : 'استخدم الكاميرا أو أضف فاتورة يدوياً للبدء.'}</div>
+                        <div style="margin-top:12px;"><button id="table-empty-add" class="empty-action-btn">${isEn ? 'Add Invoice' : 'أضف فاتورة'}</button></div>
                     </td>
                 </tr>
             `;
+            // hook add button
+            setTimeout(() => {
+                const btn = document.getElementById('table-empty-add');
+                if (btn) btn.addEventListener('click', () => { if (selectors.fastManualBtn) selectors.fastManualBtn.click(); });
+            }, 50);
         } else {
             if (selectors.dashboardEmptyState) selectors.dashboardEmptyState.style.display = 'none';
             if (selectors.recentReceiptsList) selectors.recentReceiptsList.style.display = 'flex';
@@ -607,13 +1049,13 @@ document.addEventListener("DOMContentLoaded", () => {
                 <td><strong>${inv.name}</strong></td>
                 <td class="neon-text">${inv.amount.toFixed(2)}</td>
                 <td>${inv.currency}</td>
-                <td><span style="background:rgba(62,196,202,0.1); color:var(--primary-neon); padding:4px 8px; border-radius:8px; font-size:11px;">${inv.category}</span></td>
+                <td><span style="background:rgba(22,163,74,0.1); color:var(--primary-neon); padding:4px 8px; border-radius:8px; font-size:11px;">${inv.category}</span></td>
                 <td>
                     <button class="action-btn edit-btn" ${isCurrentMonthLocked ? 'disabled' : ''} data-id="${inv.id}">
-                        <span class="material-symbols-outlined" style="font-size:18px;">edit</span>
+                        <span class="material-symbols-rounded" style="font-size:18px;">edit</span>
                     </button>
                     <button class="action-btn delete-btn" ${isCurrentMonthLocked ? 'disabled' : ''} data-id="${inv.id}">
-                        <span class="material-symbols-outlined" style="font-size:18px;">delete</span>
+                        <span class="material-symbols-rounded" style="font-size:18px;">delete</span>
                     </button>
                 </td>
             `;
@@ -626,12 +1068,64 @@ document.addEventListener("DOMContentLoaded", () => {
                     <div class="recent-store">${inv.name}</div>
                     <div class="recent-date">${inv.date} • ${inv.category}</div>
                 </div>
-                <div class="amount-accent">${inv.amount.toFixed(2)} ${inv.currency}</div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <div class="amount-accent">${inv.amount.toFixed(2)} ${inv.currency}</div>
+                    <button class="recent-delete-btn" data-id="${inv.id}" title="حذف">
+                        <span class="material-symbols-rounded" aria-hidden="true">delete</span>
+                    </button>
+                </div>
             `;
             selectors.recentReceiptsList.appendChild(card);
         });
 
         addTableActionsEventListeners();
+
+        // recent list delete handlers
+        document.querySelectorAll('.recent-delete-btn').forEach(btn => {
+            btn.addEventListener('click', async (ev) => {
+                ev.stopPropagation();
+                const invId = btn.getAttribute('data-id');
+                if (!invId) return;
+                const isEn = document.documentElement.getAttribute('lang') === 'en';
+                if (!confirm(isEn ? 'Delete this invoice?' : 'هل أنت متأكد من حذف هذه الفاتورة؟')) return;
+
+                try {
+                    await deleteInvoiceById(invId);
+                    invoicesDatabase = await loadInvoices();
+                    persistInvoicesToLocalStorage(invoicesDatabase);
+                    renderDatabaseInInterfaces();
+                } catch (err) {
+                    console.error('Recent delete failed:', err);
+                    alert(isEn ? 'Unexpected error while deleting.' : 'حدث خطأ غير متوقع أثناء الحذف.');
+                }
+            });
+        });
+
+        // populate month filter with available months
+        function populateMonthFilter() {
+            if (!selectors.filterMonth) return;
+            const existing = selectors.filterMonth.value || 'current';
+            const months = Array.from(new Set((invoicesDatabase||[]).map(i=>i.monthBucket))).sort((a,b)=>{ return new Date(b.split(' ').slice(0,2).join(' 1, ')) - new Date(a.split(' ').slice(0,2).join(' 1, ')); });
+            selectors.filterMonth.innerHTML = '';
+            const optCurrent = document.createElement('option'); optCurrent.value='current'; optCurrent.textContent = document.documentElement.getAttribute('lang')==='en' ? 'This month' : 'عرض هذا الشهر';
+            selectors.filterMonth.appendChild(optCurrent);
+            const optAll = document.createElement('option'); optAll.value='all'; optAll.textContent = document.documentElement.getAttribute('lang')==='en' ? 'All months' : 'كل الأشهر';
+            selectors.filterMonth.appendChild(optAll);
+            months.forEach(m => {
+                const o = document.createElement('option'); o.value = m; o.textContent = m; selectors.filterMonth.appendChild(o);
+            });
+            // restore previous selection where possible
+            try { selectors.filterMonth.value = existing; } catch(e){}
+        }
+
+        populateMonthFilter();
+
+        if (selectors.tableSearch) selectors.tableSearch.addEventListener('input', () => renderDatabaseInInterfaces());
+        if (selectors.filterMonth) selectors.filterMonth.addEventListener('change', () => renderDatabaseInInterfaces());
+        if (selectors.filterCurrency) selectors.filterCurrency.addEventListener('change', () => renderDatabaseInInterfaces());
+
+        // update stats panel
+        try { populateStats(); } catch(e){}
     }
 
     function addTableActionsEventListeners() {
@@ -651,7 +1145,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (!invId) return;
 
                 const isEn = document.documentElement.getAttribute('lang') === 'en';
-                if (!confirm(isEn ? 'Delete this invoice?' : 'هل تريد حذف هذه الفاتورة؟')) return;
+                if (!confirm(isEn ? 'Are you sure you want to delete this invoice?' : 'هل أنت متأكد من حذف هذه الفاتورة؟')) return;
 
                 try {
                     await deleteInvoiceById(invId);
@@ -1083,4 +1577,5 @@ document.addEventListener("DOMContentLoaded", () => {
             renderDatabaseInInterfaces();
         });
 });
+
 

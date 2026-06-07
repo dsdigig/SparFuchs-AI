@@ -1,20 +1,49 @@
 :root {
-    --bg-dark: #0f1115;
-    --surface-dark: #161920;
-    --primary-neon: #3ec4ca;
-    --text-primary: #e2e8f0;
-    --text-muted: #64748b;
-    --divider: #334155;
+    /* New premium color system (keeps app identity) */
+    --primary: #16a34a;
+    --primary-light: #22c55e;
+    --primary-dark: #15803d;
+
+    --secondary: #0ea5e9;
+    --secondary-light: #38bdf8;
+
+    --accent: #8b5cf6;
+    --accent-light: #a78bfa;
+
+    --success: #22c55e;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+
+    --background: #0f172a;
+    --surface: #1e293b;
+    --card: #111827;
+
+    --border: rgba(255,255,255,0.08);
+
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+
+    /* helpers */
+    --primary-rgb: 22,163,74; /* used for rgba overlays */
+
+    /* Backwards-compatible tokens used across the stylesheet (mapped to new system) */
+    --bg-dark: var(--background);
+    --surface-dark: var(--surface);
+    --primary-neon: var(--primary);
+    --secondary-green: var(--primary-light);
+    --accent-green: var(--accent);
+    --text-muted: var(--text-secondary);
+    --divider: rgba(255,255,255,0.06);
 
     --bg-light: #f8fafc;
     --surface-light: #ffffff;
     --text-light-main: #0f172a;
 
     /* Table */
-    --table-border: rgba(51, 51, 51, 0.18);
+    --table-border: var(--border);
 }
 body.dark-mode {
-    --table-border: rgba(226, 232, 240, 0.16);
+    --table-border: rgba(230, 238, 241, 0.10);
 }
 
 * {
@@ -33,7 +62,7 @@ body {
 }
 
 body.dark-mode {
-    background-color: var(--bg-dark);
+    background: radial-gradient(1200px 400px at 10% 10%, rgba(var(--primary-rgb),0.04), transparent 8%), linear-gradient(180deg, var(--background), #070708 60%);
     color: var(--text-primary);
 }
 
@@ -51,22 +80,62 @@ body.dark-mode {
     transform: translateY(0);
 }
 
-.neon-glow { box-shadow: 0 4px 24px rgba(62, 196, 202, 0.15); }
-.neon-text { color: var(--primary-neon) !important; }
+.neon-glow { box-shadow: 0 8px 28px rgba(var(--primary-rgb), 0.08); }
+.neon-text { color: var(--primary-neon) !important; text-shadow: 0 1px 0 rgba(0,0,0,0.2); }
 
-.app-header { height: 64px; display: flex; align-items: center; padding: 0 20px; justify-content: space-between; }
+.app-header { min-height: 72px; display: flex; align-items: center; padding: 10px 20px; justify-content: space-between; gap: 12px; }
 .app-header h1 { font-size: 20px; font-weight: 700; }
 
+/* Brand */
+.brand { display:flex; align-items:center; gap:12px; }
+.logo-circle { width:64px; height:64px; border-radius:50%; background: linear-gradient(180deg, rgba(31,179,107,0.12), rgba(0,0,0,0.02)); display:flex; align-items:center; justify-content:center; box-shadow: 0 6px 18px rgba(0,0,0,0.45); padding:8px; }
+.logo-circle.small { width:40px; height:40px; padding:6px; }
+.app-logo { height:100%; width:100%; object-fit:cover; display:block; border-radius:50%; }
+
+/* Ensure the logo image is clipped to the circular container and looks professional */
+.logo-circle { overflow: hidden; border: 1px solid rgba(255,255,255,0.06); box-shadow: 0 8px 24px rgba(2,6,8,0.12); }
+.brand-text { display:flex; flex-direction:column; line-height:1; }
+.app-title { font-family: 'Tajawal', 'Noto Kufi Arabic', sans-serif; font-size:20px; font-weight:700; letter-spacing:0.6px; }
+.brand-sub { font-size:12px; color:var(--text-muted); margin-top:2px; }
+
+.header-divider { height:1px; background: linear-gradient(90deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01)); margin: 10px 0 6px; border-radius:2px; }
+
 .main-card {
-    background: linear-gradient(135deg, #1e293b, #0f172a);
-    border: 1px solid rgba(62, 196, 202, 0.25);
-    border-radius: 28px; margin: 16px; padding: 24px; color: var(--text-primary);
+    background: linear-gradient(135deg, rgba(18,50,37,0.9), rgba(8,24,20,0.75));
+    border: 1px solid rgba(var(--primary-rgb),0.08);
+    border-radius: 18px; margin: 16px; padding: 22px; color: var(--text-primary);
 }
-body:not(.dark-mode) .main-card { background: linear-gradient(135deg, #3ec4ca, #2fa3a8); color: white; border: none; }
+body:not(.dark-mode) .main-card { background: linear-gradient(135deg, #16A34A, #22C55E); color: white; border: none; }
 .card-row { display: flex; justify-content: space-between; font-size: 14px; font-weight: 500; }
-.card-balance { font-size: 32px; font-weight: 700; margin: 16px 0; text-align: left; color: var(--primary-neon); }
+.card-balance { font-size: 30px; font-weight: 700; margin: 14px 0; text-align: left; color: var(--primary-neon); }
 html[dir="rtl"] .card-balance { text-align: right; }
 body:not(.dark-mode) .card-balance { color: white; }
+
+/* Targeted badge/chip for the month label only (no other elements changed) */
+#dashboard-month-label,
+#table-month-title {
+    font-family: 'Poppins', 'Inter', Roboto, system-ui, -apple-system, 'Segoe UI', 'Noto Kufi Arabic', sans-serif;
+    font-weight: 600; /* Medium / SemiBold */
+    font-size: 18px; /* slightly larger for a premium look */
+    letter-spacing: 0.3px;
+    color: #444444; /* requested dark gray */
+    background: rgba(0,0,0,0.06);
+    display: inline-block;
+    padding: 6px 10px;
+    border-radius: 10px;
+    line-height: 1;
+    vertical-align: middle;
+    transition: background-color 0.2s ease, color 0.2s ease, transform 0.12s ease;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+}
+
+/* Slightly smaller on narrow viewports to preserve layout */
+@media (max-width: 520px) {
+    #dashboard-month-label,
+    #table-month-title { font-size: 16px; padding: 6px 8px; }
+}
 
 .section-title-bar { display: flex; justify-content: space-between; padding: 0 20px; margin-top: 10px; align-items: center; }
 .section-title { font-weight: 700; font-size: 15px; }
@@ -74,11 +143,11 @@ body:not(.dark-mode) .card-balance { color: white; }
 
 .table-wrapper-container {
     margin: 16px; background: var(--surface-light);
-    border-radius: 20px; border: 1px solid rgba(0,0,0,0.05);
-    overflow-x: auto; padding: 8px;
+    border-radius: 14px; border: 1px solid rgba(0,0,0,0.04);
+    overflow-x: auto; padding: 8px; box-shadow: 0 6px 18px rgba(0,0,0,0.28);
 }
 body.dark-mode .table-wrapper-container { background: var(--surface-dark); border-color: var(--divider); }
-table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: right; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; text-align: right; }
 html[dir="ltr"] table { text-align: left; }
 
 /* Full borders + zebra striping */
@@ -103,21 +172,21 @@ body.dark-mode th { background-color: rgba(255,255,255,0.02); color: var(--text-
 body.dark-mode td { color: var(--text-primary); background-color: rgba(255,255,255,0.00); }
 body.dark-mode tbody tr:nth-child(even) td { background-color: rgba(255,255,255,0.03); }
 
-tr:hover td { background-color: rgba(62, 196, 202, 0.08) !important; }
+tr:hover td { background-color: rgba(var(--primary-rgb), 0.06) !important; }
 
 
 .action-btn { background: transparent; border: none; cursor: pointer; display: inline-flex; align-items: center; margin: 0 4px; padding: 4px; border-radius: 8px; transition: background 0.2s; }
-.edit-btn { color: #3ec4ca; }
+.edit-btn { color: #16A34A; }
 .delete-btn { color: #ff6b6b; }
 .action-btn:hover { background: rgba(255, 255, 255, 0.05); }
 .action-btn:disabled { color: var(--text-muted) !important; cursor: not-allowed; opacity: 0.5; }
 .lock-status-badge { background-color: #ff6b6b; color: #fff; font-size: 11px; padding: 4px 8px; border-radius: 8px; font-weight: bold; }
 
 .bottom-nav {
-    position: fixed; bottom: 0; left: 0; right: 0; height: 80px;
+    position: fixed; bottom: 12px; left: 12px; right: 12px; height: 72px;
     background-color: var(--surface-light); display: flex;
-    justify-content: space-around; align-items: center;
-    border-top: 1px solid rgba(0,0,0,0.05); z-index: 99;
+    justify-content: space-around; align-items: center; padding: 0 8px;
+    border-radius: 16px; box-shadow: 0 10px 30px rgba(2,6,8,0.6); z-index: 99;
 }
 body.dark-mode .bottom-nav { background-color: #13161c; border-top-color: var(--divider); }
 
@@ -133,11 +202,11 @@ body.dark-mode .bottom-nav { background-color: #13161c; border-top-color: var(--
 #bottom-manual-insert .header-icon-btn { padding: 0; }
 
 .nav-camera-btn {
-    width: 46px; height: 46px; border-radius: 14px;
-    background-color: var(--primary-neon); color: #0f1115;
+    width: 56px; height: 56px; border-radius: 18px;
+    background-color: var(--primary-neon); color: #0b0d10;
     border: none; cursor: pointer; display: flex; align-items: center; justify-content: center;
-    box-shadow: 0 4px 12px rgba(62, 196, 202, 0.3);
-    transition: all 0.2s ease-in-out;
+    box-shadow: 0 10px 26px rgba(var(--primary-rgb), 0.18);
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
 }
 .nav-camera-btn:active { transform: scale(0.92); }
 .nav-camera-btn span { font-size: 22px; font-weight: bold; }
@@ -150,12 +219,13 @@ body.dark-mode .bottom-nav { background-color: #13161c; border-top-color: var(--
 }
 .modal-overlay.active { display: flex; opacity: 1; }
 .modal-content {
-    background: var(--surface-light); width: 90%; max-width: 420px;
-    border-radius: 24px; padding: 24px; position: relative;
-    transform: scale(0.9); transition: transform 0.3s ease;
-    background-image: linear-gradient(180deg, rgba(62,196,202,0.08), rgba(0,0,0,0.0));
+    background: var(--surface-light); width: 92%; max-width: 520px;
+    border-radius: 14px; padding: 20px; position: relative;
+    transform: scale(0.98); transition: transform 0.22s ease, box-shadow 0.22s ease;
+    background-image: linear-gradient(180deg, rgba(var(--primary-rgb),0.05), rgba(0,0,0,0.0));
+    box-shadow: 0 20px 40px rgba(2,6,8,0.6);
 }
-body.dark-mode .modal-content { background: var(--surface-dark); border: 1px solid rgba(62, 196, 202, 0.22); background-image: linear-gradient(180deg, rgba(62,196,202,0.10), rgba(0,0,0,0.0)); }
+body.dark-mode .modal-content { background: var(--surface-dark); border: 1px solid rgba(var(--primary-rgb),0.22); background-image: linear-gradient(180deg, rgba(var(--primary-rgb),0.10), rgba(0,0,0,0.0)); }
 .modal-overlay.active .modal-content { transform: scale(1); }
 .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
 .modal-close-icon { cursor: pointer; color: var(--text-muted); }
@@ -166,7 +236,7 @@ body.dark-mode .modal-content { background: var(--surface-dark); border: 1px sol
 .form-group label { font-size: 12px; font-weight: bold; color: var(--text-muted); }
 .form-group input, .form-group select {
     background: rgba(0,0,0,0.02); border: 1px solid var(--divider); padding: 12px;
-    border-radius: 12px; color: inherit; font-size: 14px; outline: none;
+    border-radius: 10px; color: inherit; font-size: 14px; outline: none; transition: box-shadow 0.12s, border-color 0.12s;
 }
 
 .select-wrap { position: relative; }
@@ -181,7 +251,8 @@ body.dark-mode .select-wrap select { background: linear-gradient(180deg, rgba(25
 #invoice-modal select { z-index: 1003; }
 body.dark-mode .form-group input, body.dark-mode .form-group select { background: rgba(255,255,255,0.02); }
 body.dark-mode .select-caret { color: rgba(226,232,240,0.7); }
-.form-group input:focus, .form-group select:focus { border-color: var(--primary-neon); }
+.form-group input:focus, .form-group select:focus { border-color: var(--primary-neon); box-shadow: 0 6px 18px rgba(31,179,107,0.08); }
+.form-group input:focus, .form-group select:focus { border-color: var(--primary-neon); box-shadow: 0 6px 18px rgba(var(--primary-rgb),0.08); }
 .form-submit-btn {
     background: var(--primary-neon); color: #0f1115; border: none; padding: 14px;
     border-radius: 12px; font-weight: bold; cursor: pointer; margin-top: 10px; transition: transform 0.2s;
@@ -206,12 +277,52 @@ body.dark-mode .select-caret { color: rgba(226,232,240,0.7); }
 body:not(.dark-mode) .empty-title { color: var(--text-light-main); }
 .empty-subtitle { font-size: 13px; }
 
+.empty-action-btn {
+    margin-top: 16px;
+    background: linear-gradient(90deg, var(--primary), var(--accent));
+    color: #07100d; border: none; padding: 10px 18px; border-radius: 12px; font-weight: 700; cursor: pointer;
+    box-shadow: 0 10px 26px rgba(var(--primary-rgb), 0.14); transition: transform 0.14s ease, box-shadow 0.14s ease, opacity 0.14s;
+}
+.empty-action-btn:active { transform: translateY(1px) scale(0.995); }
+.empty-action-btn:hover { box-shadow: 0 16px 36px rgba(var(--primary-rgb), 0.18); }
+
+/* Responsive logo sizing tweaks */
+.logo-circle { width:72px; height:72px; }
+@media (max-width: 520px) {
+    .logo-circle { width:56px; height:56px; }
+    .app-title { font-size:18px; }
+    .header-divider { margin: 8px 0 4px; }
+}
+
 .recent-list-container { padding: 0 16px; margin-top: 12px; display: flex; flex-direction: column; gap: 10px; }
-.recent-item { background: var(--surface-light); padding: 16px; border-radius: 16px; display: flex; justify-content: space-between; align-items: center; border: 1px solid rgba(0,0,0,0.03); }
+.recent-item { background: var(--surface-light); padding: 14px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; border: 1px solid rgba(0,0,0,0.03); transition: transform 0.14s, box-shadow 0.14s; }
+.recent-item:hover { transform: translateY(-3px); box-shadow: 0 12px 30px rgba(2,6,8,0.45); }
 body.dark-mode .recent-item { background: var(--surface-dark); border-color: rgba(255,255,255,0.02); }
 .recent-store { font-weight: 700; font-size: 14px; }
 .recent-date { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
 .amount-accent { font-weight: 700; color: var(--primary-neon); font-size: 15px; }
+
+/* Small delete button inside recent list cards */
+.recent-delete-btn {
+    background: transparent;
+    border: none;
+    color: rgba(239,68,68,0.95); /* slightly muted red */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    cursor: pointer;
+    padding: 2px;
+    margin-left: 10px;
+    transition: background 0.12s, transform 0.12s, opacity 0.12s;
+}
+.recent-delete-btn:hover { background: rgba(239,68,68,0.08); transform: translateY(-1px); }
+.recent-delete-btn:active { transform: scale(0.98); }
+.recent-delete-btn .material-symbols-rounded { font-size: 18px; line-height: 1; }
+
+body.dark-mode .recent-delete-btn { color: rgba(239,68,68,0.9); }
 
 .settings-list { padding: 16px; }
 .settings-group-title { font-size: 11px; font-weight: 800; color: var(--primary-neon); margin: 12px 8px; letter-spacing: 0.6px; opacity: 0.95; }
@@ -263,33 +374,616 @@ body.dark-mode .settings-card { background-color: var(--surface-dark); }
 input:checked + .slider { background-color: var(--primary-neon); }
 input:checked + .slider:before { transform: translateX(20px); background-color: #0f1115; }
 
-/* Mobile-only: keep Amount column consistent (th + td) */
-@media (max-width: 480px) {
-  /* Fixed layout only for mobile to prevent column expansion */
-  #receipts-table {
-    table-layout: fixed;
-  }
+html,
+body {
+    width: 100%;
+    max-width: 100%;
+    overscroll-behavior: none;
+    touch-action: manipulation;
+}
 
-  /* 3rd column = Amount (Date=1, Name=2, Amount=3, Currency=4, Category=5, Actions=6) */
-  #receipts-table thead th:nth-child(3),
-  #receipts-table tbody td:nth-child(3) {
-    white-space: nowrap;
+.screen {
+    scrollbar-gutter: stable;
+}
+
+.screen.active {
+    width: 100%;
+}
+
+.main-card,
+.section-title-bar,
+.recent-list-container,
+.settings-list,
+.table-wrapper-container,
+.app-header {
+    width: min(100% - 32px, 1180px);
+    margin-inline: auto;
+}
+
+.app-header {
+    min-height: 72px;
+    height: auto;
+    gap: 16px;
+}
+
+.colored-header {
+    align-items: center;
+}
+
+.header-icon-btn,
+.action-btn {
+    min-width: 42px;
+    min-height: 42px;
+    border-radius: 12px;
+    transition: background-color 0.18s ease, color 0.18s ease, transform 0.18s ease;
+}
+
+.header-icon-btn:hover,
+.action-btn:hover {
+    background: rgba(var(--primary-rgb), 0.12);
+}
+
+.header-icon-btn:active,
+.action-btn:active {
+    transform: translateY(1px) scale(0.98);
+}
+
+.neon-glow {
+    box-shadow: 0 12px 40px rgba(var(--primary-rgb),0.08);
+}
+
+.main-card {
+    border-radius: 18px;
+    background: linear-gradient(135deg, rgba(17,24,39,0.92), rgba(30,41,59,0.88));
+    border-color: rgba(var(--primary-rgb), 0.18);
+}
+
+body:not(.dark-mode) .main-card {
+    background: linear-gradient(135deg, #16A34A, #22C55E);
+}
+
+.table-wrapper-container {
+    border-radius: 16px;
+    padding: 0;
+    overflow: auto;
+    max-width: min(1180px, calc(100vw - 32px));
+    -webkit-overflow-scrolling: touch;
+}
+
+#receipts-table {
+    width: 100%;
+    min-width: 760px;
+    table-layout: fixed;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+#receipts-table th,
+#receipts-table td {
+    padding: 12px 14px;
+    vertical-align: middle;
+    line-height: 1.55;
     overflow: hidden;
     text-overflow: ellipsis;
-
-    padding-inline: 8px !important;
-    padding-block: 10px !important;
-
-    font-size: 12px;
-    max-width: 90px;
-  }
 }
 
-/* إخفاء أزرار التصدير القديمة (تصـدير JSON و PNG) دون حذف كود JS */
-#export-data-btn,
-#export-png-btn {
-  display: none !important;
+#receipts-table th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    font-size: 13px;
+    text-transform: none;
+    white-space: nowrap;
+    border-top: 0;
 }
 
+/* ------------------------
+   Premium Responsive Overrides (Mobile First)
+   - Keep all existing classes/IDs for JS hooks
+   - Add spacing system, improved typography, shadows, hover, focus
+   - Convert bottom navigation to sidebar on desktop (>=1024px)
+   ------------------------ */
+
+:root {
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 24px;
+    --radius-sm: 10px;
+    --radius-md: 14px;
+    --radius-lg: 18px;
+}
+
+/* Prefer Cairo / fallback stack already loaded in index.html */
+* { font-family: 'Cairo', 'Noto Kufi Arabic', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
+
+/* Softer shadows and modern radii */
+.main-card, .recent-item, .settings-card, .table-wrapper-container, .modal-content {
+    border-radius: var(--radius-md);
+    box-shadow: 0 10px 30px rgba(2,6,8,0.06);
+}
+
+/* Use consistent spacing */
+.main-card { padding: var(--space-4); margin: var(--space-3); }
+.section-title-bar, .header-actions { padding: 0 var(--space-4); }
+
+/* Improve empty state visuals */
+.empty-state { gap: var(--space-2); }
+.empty-state .empty-illustration { display: none; }
+.empty-title { font-size: 18px; }
+
+/* Buttons & focus */
+button, .header-icon-btn, .action-btn { transition: transform 0.16s ease, box-shadow 0.16s ease; }
+button:focus-visible, [role="button"]:focus-visible { outline: 3px solid rgba(31,179,107,0.16); outline-offset: 4px; border-radius: 8px; }
+
+/* Bottom nav FAB centered on small screens */
+.bottom-nav { padding: 0 12px; }
+.bottom-nav .nav-item-camera-holder { position: relative; display:flex; flex-direction:column; align-items:center; }
+/* gentler lift to visually group camera icon and label without large gap */
+.bottom-nav .nav-camera-btn { transform: translateY(-10px); width: 68px; height: 68px; border-radius: 999px; box-shadow: 0 14px 36px rgba(31,179,107,0.14); }
+.bottom-nav .nav-camera-btn { transform: translateY(-10px); width: 68px; height: 68px; border-radius: 999px; box-shadow: 0 14px 36px rgba(var(--primary-rgb),0.14); }
+
+/* tighten the vertical spacing between camera and its label */
+.nav-item-camera-holder .nav-label { margin-top: 6px; font-size: 12px; }
+
+/* Make cards more interactive */
+.recent-item:hover, .settings-card:hover { transform: translateY(-6px); box-shadow: 0 20px 40px rgba(2,6,8,0.08); }
+
+/* Accessibility: focusable rows */
+tbody tr { transition: background-color 0.12s ease; }
+tbody tr:focus-within { background: rgba(var(--primary-rgb),0.04); }
+
+/* Desktop / Large screens: sidebar and dashboard grid */
+@media (min-width: 1024px) {
+    /* Sidebar */
+    .bottom-nav {
+        position: fixed; top: 24px; left: 24px; bottom: 24px; width: 92px; height: calc(100% - 48px);
+        flex-direction: column; align-items: center; gap: var(--space-3); padding: 12px; border-radius: 14px;
+        justify-content: flex-start; z-index: 120;
+    }
+    html[dir="rtl"] .bottom-nav { left: auto; right: 24px; }
+    .bottom-nav .nav-item { flex: none; width: 100%; display:flex; align-items:center; justify-content:center; padding: 10px 6px; }
+    .bottom-nav .nav-label { display: none; }
+
+    /* keep camera control but smaller */
+    .nav-camera-btn { width: 54px; height: 54px; transform: none; border-radius: 10px; }
+
+    /* Shift content to avoid overlap while preserving HTML structure */
+    .screen { margin-left: 124px; }
+    html[dir="rtl"] .screen { margin-left: 0; margin-right: 124px; }
+
+    /* Dashboard style: arrange header + KPIs + recent + analytics + reports
+       Use existing elements where possible; add a visual analytics placeholder via pseudo-element. */
+    #screen-dashboard { display: grid; grid-template-columns: 1fr 360px; grid-template-rows: auto auto 1fr; gap: var(--space-4); align-items: start; }
+    #screen-dashboard > .app-header { grid-column: 1 / -1; }
+    #screen-dashboard > .main-card { grid-column: 1 / 2; display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-3); align-items: stretch; }
+    /* Turn main-card content into 4 visual KPI tiles (purely presentational) */
+    #screen-dashboard > .main-card .card-row, #screen-dashboard > .main-card .card-balance, #screen-dashboard > .main-card .card-footer { display: none; }
+    #screen-dashboard > .main-card::before { content: ""; display:block; }
+    #screen-dashboard > .recent-list-container { grid-column: 1 / 2; max-height: 640px; overflow: auto; }
+    #screen-dashboard::after { content: "Analytics"; grid-column: 2 / 3; background: linear-gradient(180deg, rgba(var(--primary-rgb),0.04), rgba(0,0,0,0.02)); border-radius: var(--radius-md); padding: var(--space-4); color: var(--text-muted); font-weight:700; text-align:center; align-self:start; }
+}
+
+/* Larger desktop tweaks */
+@media (min-width: 1440px) {
+    .screen { margin-left: 160px; }
+    html[dir="rtl"] .screen { margin-right: 160px; margin-left: 0; }
+}
+
+
+#receipts-table td {
+    white-space: nowrap;
+}
+
+#receipts-table th:nth-child(1),
+#receipts-table td:nth-child(1) { width: 130px; }
+#receipts-table th:nth-child(2),
+#receipts-table td:nth-child(2) { width: 240px; }
+#receipts-table th:nth-child(3),
+#receipts-table td:nth-child(3) { width: 130px; }
+#receipts-table th:nth-child(4),
+#receipts-table td:nth-child(4) { width: 110px; }
+#receipts-table th:nth-child(5),
+#receipts-table td:nth-child(5) { width: 150px; }
+#receipts-table th:nth-child(6),
+#receipts-table td:nth-child(6) { width: 120px; text-align: center; }
+
+#receipts-table td:nth-child(2),
+#receipts-table td:nth-child(5) {
+    white-space: normal;
+    word-break: break-word;
+}
+
+.modal-overlay {
+    padding: 16px;
+    overflow: hidden;
+}
+
+#invoice-modal {
+    overflow: hidden;
+}
+
+.modal-content {
+    width: min(100%, 460px);
+    max-height: min(92dvh, 720px);
+    overflow: auto;
+    border-radius: 18px;
+    padding: 22px;
+}
+
+.modal-header {
+    gap: 16px;
+    margin-bottom: 18px;
+}
+
+.modal-header h3 {
+    font-size: 18px;
+    line-height: 1.4;
+}
+
+.modal-close-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 40px;
+    min-height: 40px;
+    border-radius: 12px;
+}
+
+.modal-form {
+    gap: 14px;
+}
+
+.form-group-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 12px;
+}
+
+.form-group,
+.form-group-row .form-group,
+.select-wrap {
+    min-width: 0;
+}
+
+.form-group input,
+.form-group select,
+.form-submit-btn {
+    width: 100%;
+    min-height: 48px;
+    height: 48px;
+}
+
+.form-group input,
+.form-group select {
+    padding: 0 14px;
+    border-radius: 12px;
+    border-color: rgba(100, 116, 139, 0.42);
+}
+
+.form-group input[type="number"] {
+    direction: ltr;
+    text-align: start;
+    font-variant-numeric: tabular-nums;
+}
+
+html[dir="rtl"] .form-group input[type="number"] {
+    text-align: right;
+}
+
+.form-submit-btn {
+    margin-top: 4px;
+    color: #062111;
+    background: linear-gradient(135deg, #16A34A, #4ADE80);
+}
+
+.camera-overlay {
+    z-index: 1001;
+    flex-direction: column;
+    gap: 20px;
+    padding: 24px;
+}
+
+.camera-viewfinder {
+    width: min(92vw, 720px);
+    height: min(62dvh, 520px);
+    overflow: hidden;
+    background: #050505;
+    border-color: rgba(74, 222, 128, 0.42);
+}
+
+#camera-video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 22px;
+}
+
+.capture-cam-btn {
+    width: 68px;
+    height: 68px;
+    border-radius: 50%;
+    border: 4px solid rgba(255,255,255,0.35);
+    background: var(--primary);
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 12px 30px rgba(var(--primary-rgb), 0.35);
+}
+
+.capture-cam-btn span {
+    font-size: 30px;
+}
+
+.ocr-loader-text {
+    bottom: 14px;
+    left: 16px;
+    right: 16px;
+    width: auto;
+    padding: 8px 12px;
+    border-radius: 999px;
+    background: rgba(0,0,0,0.55);
+}
+
+.close-cam-btn {
+    top: 24px;
+    inset-inline-end: 24px;
+    right: auto;
+}
+
+@media (min-width: 900px) {
+    body {
+        flex-direction: row;
+    }
+
+    .bottom-nav {
+        top: 0;
+        bottom: 0;
+        width: 92px;
+        height: 100vh;
+        flex-direction: column;
+        border-top: 0;
+        border-inline-end: 1px solid rgba(255,255,255,0.08);
+    }
+
+    html[dir="rtl"] .bottom-nav {
+        right: 0;
+        left: auto;
+    }
+
+    html[dir="ltr"] .bottom-nav {
+        left: 0;
+        right: auto;
+    }
+
+    .screen {
+        padding-bottom: 24px;
+        padding-inline: 112px 24px;
+    }
+
+    html[dir="ltr"] .screen {
+        padding-inline: 112px 24px;
+    }
+
+    html[dir="rtl"] .screen {
+        padding-inline: 24px 112px;
+    }
+
+    .nav-item,
+    .nav-item-camera-holder {
+        flex: 0 0 auto;
+        width: 100%;
+        min-height: 76px;
+    }
+}
+
+@media (max-width: 640px) {
+    .main-card,
+    .section-title-bar,
+    .recent-list-container,
+    .settings-list,
+    .table-wrapper-container,
+    .app-header {
+        width: calc(100% - 24px);
+    }
+
+    .app-header {
+        flex-wrap: wrap;
+        padding: 12px 0;
+    }
+
+    #screen-archive .header-actions {
+        order: 2;
+        width: 100%;
+        overflow-x: auto;
+        padding-bottom: 2px;
+    }
+
+    .form-group-row {
+        grid-template-columns: 1fr;
+    }
+
+    .modal-content {
+        padding: 18px;
+        max-height: 88dvh;
+    }
+
+    #receipts-table {
+        min-width: 720px;
+        font-size: 13px;
+    }
+
+    .camera-viewfinder {
+        width: 100%;
+        height: 58dvh;
+    }
+}
+
+/* Desktop compatibility override: keep bottom navigation at bottom (prevent sidebar takeover)
+   and tighten camera button spacing so it aligns with its label on PC screens.
+   These are non-invasive CSS overrides that do not change IDs/classes or JS behavior. */
+@media (min-width: 900px) {
+    .bottom-nav {
+        position: fixed !important;
+        bottom: 12px !important;
+        left: 12px !important;
+        right: 12px !important;
+        width: auto !important;
+        height: 72px !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        justify-content: space-around !important;
+        padding: 0 12px !important;
+        border-radius: 16px !important;
+        z-index: 999 !important;
+    }
+
+    /* ensure camera button sits visually next to its label (no large downward offset) */
+    .bottom-nav .nav-camera-btn { transform: translateY(-4px) !important; }
+    .nav-item-camera-holder { display:flex; flex-direction:column; align-items:center; gap:6px; }
+    .nav-item-camera-holder .nav-label { margin-top: 2px !important; }
+
+    /* prevent screen content shift caused by earlier sidebar rules */
+    .screen { margin-left: 0 !important; margin-right: 0 !important; }
+    html[dir="rtl"] .screen { margin-right: 0 !important; margin-left: 0 !important; }
+}
+
+/* Keep table visuals intact, only add subtle UI refinements requested */
+
+/* Archive header: hide non-essential header buttons but keep export tools (PDF) visible */
+#screen-archive .header-actions > :not(.export-tools) {
+    display: none !important;
+}
+
+/* Style the PDF export button as a clear primary action (modern look) */
+#screen-archive .export-tools #download-pdf-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    background: linear-gradient(180deg,#e33b3b,#b91c1c); color: #fff;
+    padding: 8px 12px; border-radius: 12px; min-width: 44px; height:44px;
+    box-shadow: 0 10px 30px rgba(185,28,28,0.18); border: none; cursor: pointer;
+    transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease;
+}
+#screen-archive .export-tools #download-pdf-btn .material-symbols-rounded { font-size: 20px; }
+#screen-archive .export-tools #download-pdf-btn:hover { transform: translateY(-2px); box-shadow: 0 16px 44px rgba(185,28,28,0.22); }
+#screen-archive .export-tools #download-pdf-btn:active { transform: translateY(0); opacity: 0.95; }
+
+/* Table: add subtle vertical divider between Date (col 1) and Receipt Name (col 2) */
+#receipts-table th:nth-child(1), #receipts-table td:nth-child(1) {
+    border-right: 1px solid rgba(0,0,0,0.06);
+}
+
+/* Camera spacing tweak: bring camera button closer to its label "مسح الفاتورة" */
+.bottom-nav .nav-camera-btn { transform: translateY(-2px); }
+.nav-item-camera-holder .nav-label { margin-top: 0; font-size: 12px; }
+
+
+
+/* Final UI polish overrides (non-invasive, don't change DOM or JS hooks) */
+
+/* hide the secondary subtitle text under the app title (preserve element for JS/layout) */
+.brand-sub { display: none !important; }
+.brand-text { justify-content: center; }
+
+/* Replace heavy full-cell borders with subtle dividers */
+#receipts-table th, #receipts-table td { border: none !important; }
+#receipts-table thead th { border-bottom: 1px solid rgba(0,0,0,0.06); }
+#receipts-table tbody td { border-bottom: 1px solid rgba(0,0,0,0.04); }
+#receipts-table th:not(:last-child), #receipts-table td:not(:last-child) { border-right: 1px solid rgba(0,0,0,0.04); }
+body.dark-mode #receipts-table thead th { border-bottom-color: rgba(255,255,255,0.04); }
+body.dark-mode #receipts-table tbody td { border-bottom-color: rgba(255,255,255,0.03); }
+body.dark-mode #receipts-table th:not(:last-child), body.dark-mode #receipts-table td:not(:last-child) { border-right-color: rgba(255,255,255,0.03); }
+
+/* Ensure the PDF export remains the only visible export control in the archive header */
+#screen-archive .header-actions > :not(.export-tools) { display: none !important; }
+
+/* Tidy PDF button (also mobile-friendly) */
+#screen-archive .export-tools #download-pdf-btn { min-width:44px; height:44px; padding:10px 12px; border-radius:12px; }
+
+/* More conservative camera-to-label spacing for small and large screens */
+.bottom-nav .nav-camera-btn { transform: translateY(-6px); }
+.nav-item-camera-holder .nav-label { margin-top: 2px; line-height: 1; }
+
+/* Add a subtle separator specifically for the Category column chip */
+#receipts-table td:nth-child(5) span {
+    display: inline-block;
+    padding-inline-start: 8px;
+    padding-inline-end: 8px;
+    border-inline-start: 1px solid rgba(0,0,0,0.04);
+}
+body.dark-mode #receipts-table td:nth-child(5) span {
+    border-inline-start-color: rgba(255,255,255,0.03);
+}
+
+/* Make the Category column visually sticky so classifications remain visible while scrolling */
+#receipts-table th:nth-child(5), #receipts-table td:nth-child(5) {
+    position: sticky;
+    z-index: 3;
+    /* keep background consistent with theme */
+    background-clip: padding-box;
+}
+
+html[dir="rtl"] #receipts-table th:nth-child(5), html[dir="rtl"] #receipts-table td:nth-child(5) {
+    right: 0;
+    border-inline-start: 1px solid rgba(0,0,0,0.06);
+}
+html[dir="ltr"] #receipts-table th:nth-child(5), html[dir="ltr"] #receipts-table td:nth-child(5) {
+    left: 0;
+    border-inline-end: 1px solid rgba(0,0,0,0.06);
+}
+body.dark-mode html[dir="rtl"] #receipts-table th:nth-child(5), body.dark-mode html[dir="rtl"] #receipts-table td:nth-child(5) {
+    border-inline-start-color: rgba(255,255,255,0.03);
+}
+body.dark-mode html[dir="ltr"] #receipts-table th:nth-child(5), body.dark-mode html[dir="ltr"] #receipts-table td:nth-child(5) {
+    border-inline-end-color: rgba(255,255,255,0.03);
+}
+
+/* Slight hover affordance for delete action (visual only, no logic changes) */
+.action-btn.delete-btn:hover { background: rgba(255,107,107,0.08); }
+
+/* Prevent table overflow on very narrow viewports while keeping column dividers */
+@media (max-width: 430px) {
+    #receipts-table { min-width: 100% !important; table-layout: auto; }
+    #receipts-table th, #receipts-table td { padding: 10px; font-size: 13px; }
+    .table-wrapper-container { padding: 6px; }
+}
+
+/* Hide the verbose 'no data / no invoices' content in the table to keep UI clean
+   Keep the action button (if present) visible. This targets both the static HTML
+   initial `#no-data-row` and the dynamic block inserted by script.js. */
+#receipts-table #no-data-row .table-empty-illustration,
+#receipts-table #no-data-row td > div:nth-of-type(1),
+#receipts-table #no-data-row td > div:nth-of-type(2),
+#receipts-table #no-data-row span {
+    display: none !important;
+}
+
+/* --- App title & circular logo polish --- */
+/* Make the app title slightly larger and bolder for clarity */
+.app-title {
+    font-size: 24px !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.8px;
+}
+
+/* Enlarge circular logo for a clearer, professional mark */
+.logo-circle {
+    width: 96px !important;
+    height: 96px !important;
+    padding: 12px !important;
+    border-radius: 50% !important;
+}
+
+/* Ensure logo image remains clipped and sharp */
+.app-logo { border-radius: 50% !important; object-fit: cover !important; }
+
+@media (max-width: 520px) {
+    .app-title { font-size: 22px !important; }
+    .logo-circle { width: 72px !important; height: 72px !important; padding: 8px !important; }
+}
 
 
