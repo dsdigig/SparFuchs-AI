@@ -29,6 +29,9 @@
 
     };
 
+    // Standard item categories (used for select dropdowns)
+    const ITEM_CATEGORIES = ['مواد غذائية','إلكترونيات','وقود','مطاعم','مشروبات','خضروات وفواكه','منظفات','مستحضرات','أخرى'];
+
 
     // ------- localStorage helpers (used as fallback/recovery) -------
     function loadInvoicesFromLocalStorage() {
@@ -244,6 +247,13 @@
         exportDataBtn: document.getElementById("export-data-btn"),
         importDataBtn: document.getElementById("import-data-btn"),
         importDataInput: document.getElementById("import-data-input"),
+        pasteTextBtn: document.getElementById("paste-text-btn"),
+        textModal: document.getElementById("text-modal"),
+        rawInvoiceText: document.getElementById("raw-invoice-text"),
+        parseTextBtn: document.getElementById("parse-text-btn"),
+        jsonOutput: document.getElementById("json-output"),
+        copyJsonBtn: document.getElementById("copy-json-btn"),
+        closeTextModalBtn: document.getElementById("close-text-modal"),
         themeToggle: document.getElementById("theme-toggle"),
 
         langRadios: document.querySelectorAll('input[name="language"]'),
@@ -291,27 +301,50 @@
                     const qtyTd = document.createElement('td');
                     const unitTd = document.createElement('td');
                     const totalTd = document.createElement('td');
+                    const catTd = document.createElement('td');
 
                     nameTd.style.padding = '8px'; nameTd.style.textAlign = 'right';
                     qtyTd.style.padding = '8px'; qtyTd.style.textAlign = 'center';
                     unitTd.style.padding = '8px'; unitTd.style.textAlign = 'center';
                     totalTd.style.padding = '8px'; totalTd.style.textAlign = 'left';
+                    catTd.style.padding = '8px'; catTd.style.textAlign = 'center';
 
-                    nameTd.textContent = it.name || '';
-                    qtyTd.textContent = (typeof it.quantity !== 'undefined' && it.quantity !== null) ? String(it.quantity) : '';
-                    unitTd.textContent = (typeof it.unit_price !== 'undefined' && it.unit_price !== null) ? Number(it.unit_price).toFixed(2) : '';
-                    totalTd.textContent = (typeof it.total_price !== 'undefined' && it.total_price !== null) ? Number(it.total_price).toFixed(2) : '';
+                    // support multiple shapes from AI or parsers
+                    const name = it.name || it.item || '';
+                    const quantity = (typeof it.quantity !== 'undefined') ? it.quantity : (typeof it.qty !== 'undefined' ? it.qty : '');
+                    const unit_price = (typeof it.unit_price !== 'undefined') ? it.unit_price : (typeof it.unit !== 'undefined' ? it.unit : (typeof it.unitPrice !== 'undefined' ? it.unitPrice : ''));
+                    const total_price = (typeof it.total_price !== 'undefined') ? it.total_price : (typeof it.total !== 'undefined' ? it.total : (typeof it.totalPrice !== 'undefined' ? it.totalPrice : ''));
+                    const category = it.category || it.cat || inferCategory(name) || '';
+
+                    nameTd.textContent = name;
+                    qtyTd.textContent = (quantity !== null && typeof quantity !== 'undefined') ? String(quantity) : '';
+                    unitTd.textContent = (unit_price !== null && typeof unit_price !== 'undefined' && unit_price !== '') ? Number(unit_price).toFixed(2) : '';
+                    totalTd.textContent = (total_price !== null && typeof total_price !== 'undefined' && total_price !== '') ? Number(total_price).toFixed(2) : '';
+
+                    // category input with datalist (combobox) to allow typing or picking
+                    const catInput = document.createElement('input');
+                    catInput.type = 'text';
+                    catInput.setAttribute('list', 'category-datalist');
+                    catInput.style.padding = '6px 8px';
+                    catInput.style.borderRadius = '6px';
+                    catInput.style.border = '1px solid rgba(0,0,0,0.06)';
+                    catInput.style.background = 'transparent';
+                    catInput.style.minWidth = '110px';
+                    catInput.value = category || ITEM_CATEGORIES[ITEM_CATEGORIES.length-1];
+                    catTd.appendChild(catInput);
+                    catTd.title = 'اختر أو اكتب تصنيفاً جديداً';
 
                     tr.appendChild(nameTd);
                     tr.appendChild(qtyTd);
                     tr.appendChild(unitTd);
                     tr.appendChild(totalTd);
+                    tr.appendChild(catTd);
                     tbody.appendChild(tr);
                 });
             }
             if (totalEl) {
                 // compute sum if not provided
-                const sum = items.reduce((s,it) => s + (Number(it.total_price) || 0), 0);
+                const sum = items.reduce((s,it) => s + (Number(it.total_price) || Number(it.total) || 0), 0);
                 totalEl.textContent = 'المجموع: ' + sum.toFixed(2);
             }
             if (region) region.style.display = '';
@@ -336,25 +369,29 @@
             if (Array.isArray(data.items) && data.items.length) {
                 data.items.forEach(it => {
                     const tr = document.createElement('tr');
-                    const tdName = document.createElement('td');
+                        const tdName = document.createElement('td');
                     const tdQty = document.createElement('td');
                     const tdUnit = document.createElement('td');
                     const tdTotal = document.createElement('td');
+                    const tdCat = document.createElement('td');
 
                     tdName.textContent = it.name || '';
                     tdQty.textContent = (typeof it.quantity !== 'undefined' && it.quantity !== null) ? String(it.quantity) : '';
                     tdUnit.textContent = (typeof it.unit_price !== 'undefined' && it.unit_price !== null) ? Number(it.unit_price).toFixed(2) : '';
                     tdTotal.textContent = (typeof it.total_price !== 'undefined' && it.total_price !== null) ? Number(it.total_price).toFixed(2) : '';
+                    tdCat.textContent = it.category || inferCategory(it.name || '');
 
                     tdName.style.padding = '10px'; tdName.style.textAlign = 'right';
                     tdQty.style.padding = '10px'; tdQty.style.textAlign = 'center';
                     tdUnit.style.padding = '10px'; tdUnit.style.textAlign = 'center';
                     tdTotal.style.padding = '10px'; tdTotal.style.textAlign = 'left';
+                    tdCat.style.padding = '10px'; tdCat.style.textAlign = 'center';
 
                     tr.appendChild(tdName);
                     tr.appendChild(tdQty);
                     tr.appendChild(tdUnit);
                     tr.appendChild(tdTotal);
+                    tr.appendChild(tdCat);
                     tbody.appendChild(tr);
                 });
             } else {
@@ -1163,6 +1200,154 @@
         selectors.invoiceModal.classList.add('active');
     }
 
+    // ------------------ Paste-text modal: parse free text invoice -> JSON ------------------
+    function parseInvoiceText(rawText) {
+        const text = String(rawText || '').trim();
+        const normalized = normalizeOcrDigits(text);
+        const lines = normalized.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+
+        const ignoreRe = /total|subtotal|amount|grand|net|tax|cash|visa|balance|المجموع|الإجمالي|اجمالي|ضريبة|فاتورة|تاريخ|المبلغ|سعر الوحدة/i;
+
+        const items = [];
+
+        for (const line of lines) {
+            if (ignoreRe.test(line) && !/\d/.test(line)) continue;
+
+            // extract numeric tokens (quantities/prices)
+            const numTokens = (line.match(/\d+(?:[.,]\d{1,2})?/g) || []).map(s => s.replace(/,/g, '.'));
+            const amounts = numTokens.map(n => parseFloat(n)).filter(n => Number.isFinite(n));
+
+            // skip lines that appear to be headers without numbers
+            if (amounts.length === 0) continue;
+
+            // derive name by removing numbers and common separators
+            let name = line.replace(/\d+(?:[.,]\d{1,2})?/g, '').replace(/x|×|@/gi, '').replace(/[:\-–—]/g, '').replace(/\s{2,}/g, ' ').trim();
+            if (!name) name = line;
+
+            let qty = 1;
+            let unit_price = 0;
+            let total = 0;
+
+            if (amounts.length >= 3) {
+                // assume [qty, unit, ..., total]
+                qty = Math.round(amounts[0]);
+                unit_price = amounts[1];
+                total = amounts[amounts.length - 1];
+            } else if (amounts.length === 2) {
+                const [a1, a2] = amounts;
+                // heuristic: if first is integer and small -> qty
+                if (Number.isInteger(a1) && a1 > 0 && a1 <= 1000 && String(numTokens[0]).indexOf('.') === -1) {
+                    qty = a1;
+                    unit_price = a2;
+                    total = +(qty * unit_price).toFixed(2);
+                } else {
+                    // treat as unit_price and total (qty=1)
+                    qty = 1;
+                    unit_price = a1;
+                    total = a2;
+                }
+            } else if (amounts.length === 1) {
+                qty = 1;
+                unit_price = amounts[0];
+                total = amounts[0];
+            }
+
+            // ensure numeric rounding and logical correction
+            qty = Number(qty);
+            unit_price = Number(Number(unit_price).toFixed(2));
+            const calc = Number((qty * unit_price).toFixed(2));
+            if (!Number.isFinite(total) || Math.abs(calc - Number(total)) > 0.01) {
+                total = calc;
+            } else {
+                total = Number(Number(total).toFixed(2));
+            }
+
+            items.push({ name: name, qty: qty, unit_price: unit_price, total: total });
+        }
+
+        const grand_total = Number((items.reduce((s, it) => s + (Number(it.total) || 0), 0)).toFixed(2));
+
+        return { items, grand_total };
+    }
+
+    // Simple heuristic category inference based on keywords
+    function inferCategory(name) {
+        if (!name) return '';
+        const s = String(name).toLowerCase();
+        const map = [
+            { keys: ['خبز','رغيف','تنور'], cat: 'مواد غذائية' },
+            { keys: ['لبن','حليب','جبن','زبادي'], cat: 'مواد غذائية' },
+            { keys: ['فحم','وقود','بنزين','ديزل','محطة'], cat: 'وقود' },
+            { keys: ['مياه','مياة'], cat: 'مشروبات' },
+            { keys: ['عطر','معطر','بخاخ'], cat: 'مستحضرات' },
+            { keys: ['تفاح','برتقال','ليمون','موز','خضار','خس','طماطم'], cat: 'خضروات وفواكه' },
+            { keys: ['سجاد','منظف','صابون','مطهر'], cat: 'منظفات' },
+            { keys: ['مطعم','مطاعم','غداء','عشاء'], cat: 'مطاعم' }
+        ];
+        for (const m of map) {
+            for (const k of m.keys) if (s.includes(k)) return m.cat;
+        }
+        return '';
+    }
+
+    // Modal controls for paste-text
+    if (selectors.pasteTextBtn) {
+        selectors.pasteTextBtn.addEventListener('click', () => {
+            if (!selectors.textModal) return;
+            selectors.textModal.style.display = 'block';
+            selectors.rawInvoiceText.value = '';
+            selectors.jsonOutput.style.display = 'none';
+            selectors.copyJsonBtn.style.display = 'none';
+            setTimeout(() => selectors.rawInvoiceText.focus(), 80);
+        });
+    }
+
+    if (selectors.closeTextModalBtn) {
+        selectors.closeTextModalBtn.addEventListener('click', () => {
+            if (!selectors.textModal) return;
+            selectors.textModal.style.display = 'none';
+        });
+    }
+
+    if (selectors.parseTextBtn) {
+        selectors.parseTextBtn.addEventListener('click', (ev) => {
+            ev.preventDefault();
+            const raw = selectors.rawInvoiceText ? selectors.rawInvoiceText.value : '';
+            const parsed = parseInvoiceText(raw || '');
+            // build strict JSON as requested
+            const out = { items: [] , grand_total: 0 };
+            out.items = parsed.items.map(it => ({ name: it.name || '', qty: Number(it.qty) || 0, unit_price: Number(it.unit_price) || 0, total: Number(it.total) || 0 }));
+            out.grand_total = Number(parsed.grand_total || 0);
+
+            if (selectors.jsonOutput) {
+                selectors.jsonOutput.textContent = JSON.stringify(out, null, 2);
+                selectors.jsonOutput.style.display = 'block';
+            }
+            if (selectors.copyJsonBtn) selectors.copyJsonBtn.style.display = 'inline-block';
+            // Also populate modal items for review (convert keys to expected shape)
+            const normalized = (out.items || []).map(i => ({ name: i.name || '', quantity: Number(i.qty || i.quantity || 0), unit_price: Number(i.unit_price || i.unit || 0), total_price: Number(i.total || i.total_price || 0), category: inferCategory(i.name || '') }));
+            renderInvoiceItems(normalized);
+            openInvoiceModalForAdd();
+            if (selectors.formAmount) {
+                selectors.formAmount.dataset.rawValue = Number(out.grand_total || 0).toFixed(2);
+                selectors.formAmount.value = Number(out.grand_total || 0).toLocaleString(undefined,{minimumFractionDigits:2, maximumFractionDigits:2});
+            }
+        });
+    }
+
+    if (selectors.copyJsonBtn) {
+        selectors.copyJsonBtn.addEventListener('click', async () => {
+            try {
+                const txt = selectors.jsonOutput ? selectors.jsonOutput.textContent : '';
+                await navigator.clipboard.writeText(txt || '');
+                selectors.copyJsonBtn.textContent = 'نسخ✓';
+                setTimeout(() => { selectors.copyJsonBtn.textContent = 'نسخ JSON'; }, 1200);
+            } catch (e) {
+                console.warn('copy failed', e);
+            }
+        });
+    }
+
     // Save form (insert/update) using IndexedDB (primary) + localStorage (fallback)
     if(selectors.invoiceForm) {
         selectors.invoiceForm.addEventListener('submit', async (e) => {
@@ -1192,6 +1377,44 @@
                     category,
                     monthBucket: activeMonthBucket
                 };
+
+                // If invoice items are present in the modal, read and attach them
+                try {
+                    const itemsTbody = document.getElementById('invoice-items-tbody');
+                    if (itemsTbody && itemsTbody.children && itemsTbody.children.length) {
+                        const items = [];
+                        Array.from(itemsTbody.children).forEach(row => {
+                            const cols = row.children;
+                            if (!cols || cols.length < 4) return;
+                            const nameCell = cols[0].textContent.trim();
+                            const qtyCell = cols[1].textContent.trim();
+                            const unitCell = cols[2].textContent.trim();
+                            const totalCell = cols[3].textContent.trim();
+                            let catCell = '';
+                            if (cols[4]) {
+                                const el = (cols[4].querySelector && (cols[4].querySelector('input') || cols[4].querySelector('select')));
+                                catCell = el ? (el.value || '').trim() : cols[4].textContent.trim();
+                            }
+                            const q = parseFloat(qtyCell.replace(/,/g,'.')) || 0;
+                            const u = parseFloat(unitCell.replace(/,/g,'.')) || 0;
+                            const t = parseFloat(totalCell.replace(/,/g,'.')) || Number((q*u).toFixed(2));
+                            items.push({ name: nameCell, quantity: q, unit_price: u, total_price: t, category: catCell || inferCategory(nameCell) });
+                        });
+                        if (items.length) {
+                            invoiceToWrite.items = items;
+                            // derive amount from items if original amount invalid or zero
+                            const itemsSum = items.reduce((s,it) => s + (Number(it.total_price)||0), 0);
+                            if (!Number.isFinite(invoiceToWrite.amount) || invoiceToWrite.amount === 0) invoiceToWrite.amount = Number(itemsSum.toFixed(2));
+                            // if top-level category empty, pick most common item category
+                            if (!invoiceToWrite.category || invoiceToWrite.category === '') {
+                                const freq = {};
+                                items.forEach(it => { if (it.category) freq[it.category] = (freq[it.category]||0)+1; });
+                                const top = Object.keys(freq).sort((a,b)=>freq[b]-freq[a])[0];
+                                if (top) invoiceToWrite.category = top;
+                            }
+                        }
+                    }
+                } catch (e) { console.warn('read items failed', e); }
 
                 await saveInvoice(invoiceToWrite);
 

@@ -72,13 +72,14 @@
             </div>
 
             <div class="scanned-items-wrapper">
-                <table class="scanned-table" role="table" aria-label="Scanned invoice items">
+                <table class="scanned-table receipt-table" role="table" aria-label="Scanned invoice items">
                     <thead>
                         <tr>
                             <th class="lang-text" data-en="Item" data-ar="الوصف">الوصف</th>
                             <th class="lang-text" data-en="Qty" data-ar="الكمية">الكمية</th>
                             <th class="lang-text" data-en="Unit" data-ar="سعر الوحدة">سعر الوحدة</th>
                             <th class="lang-text" data-en="Total" data-ar="المجموع">المجموع</th>
+                            <th class="lang-text" data-en="Category" data-ar="التصنيف">التصنيف</th>
                         </tr>
                     </thead>
                     <tbody id="scanned-items-tbody">
@@ -88,7 +89,7 @@
             </div>
 
             <div class="scanned-summary">
-                <div id="scanned-total" class="scanned-total">المجموع: —</div>
+                <div id="scanned-total" class="scanned-total receipt-total-box">المجموع: —</div>
             </div>
         </div>
 
@@ -106,6 +107,10 @@
                 </button>
                 <button id="import-data-btn" class="header-icon-btn" title="استيراد البيانات">
                     <span class="material-symbols-rounded">upload</span>
+                </button>
+
+                <button id="paste-text-btn" class="header-icon-btn" title="لصق نص الفاتورة">
+                    <span class="material-symbols-rounded">edit_note</span>
                 </button>
 
                 <!-- Export buttons (PDF + PNG) -->
@@ -138,7 +143,7 @@
 
         <div class="table-wrapper-container" id="repaint-boundary-area">
 
-            <table id="receipts-table">
+            <table id="receipts-table" class="receipt-table">
                 <thead>
                     <tr>
                             <th scope="col" class="lang-text" data-en="Date" data-ar="التاريخ">التاريخ</th>
@@ -253,19 +258,43 @@
             <div id="invoice-items-region" class="invoice-items-region" style="display:none; margin-top:16px;">
                 <h4 class="lang-text" data-en="Items" data-ar="البنود">البنود</h4>
                 <div style="overflow:auto; max-height:220px;">
-                    <table id="invoice-items-table" style="width:100%; border-collapse:collapse;">
+                    <table id="invoice-items-table" class="receipt-table" style="width:100%; border-collapse:collapse;">
                         <thead>
                             <tr>
                                 <th style="text-align:right; padding:8px;">الوصف</th>
                                 <th style="text-align:center; padding:8px;">الكمية</th>
                                 <th style="text-align:center; padding:8px;">سعر الوحدة</th>
                                 <th style="text-align:left; padding:8px;">المجموع</th>
+                                <th style="text-align:center; padding:8px;">التصنيف</th>
                             </tr>
                         </thead>
                         <tbody id="invoice-items-tbody"></tbody>
                     </table>
                 </div>
-                <div id="invoice-items-total" style="margin-top:8px; font-weight:700; text-align:left;"></div>
+                <div style="display:flex; gap:8px; justify-content:space-between; align-items:center; margin-top:8px;">
+                    <div id="invoice-items-total" class="receipt-total-box" style="text-align:left;"></div>
+                    <div>
+                        <button id="recompute-items-btn" class="form-submit-btn" style="padding:8px 12px;">إعادة حساب البنود</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Text paste modal: paste raw invoice text and convert to JSON -->
+    <div id="text-modal" class="modal-overlay" aria-hidden="true" style="display:none;">
+        <div class="modal-content neon-glow">
+            <div class="modal-header">
+                <h3 class="lang-text" data-en="Paste Invoice Text" data-ar="لصق نص الفاتورة">لصق نص الفاتورة</h3>
+                <span id="close-text-modal" class="material-symbols-rounded modal-close-icon" role="button" tabindex="0" aria-label="اغلاق">close</span>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:8px;">
+                <textarea id="raw-invoice-text" placeholder="ألصق هنا النص الخام للفاتورة" style="min-width:320px; min-height:160px; padding:8px; direction:rtl;"></textarea>
+                <div style="display:flex; gap:8px; justify-content:flex-end;">
+                    <button id="parse-text-btn" class="form-submit-btn neon-glow">تحويل إلى JSON</button>
+                    <button id="copy-json-btn" class="form-submit-btn" style="display:none;">نسخ JSON</button>
+                </div>
+                <pre id="json-output" style="background:#0b0b0b; color:#e6e6e6; padding:12px; border-radius:8px; max-height:320px; overflow:auto; display:none; white-space:pre-wrap;"></pre>
             </div>
         </div>
     </div>
@@ -322,6 +351,19 @@
             <span class="nav-label lang-text" data-en="Settings" data-ar="الإعدادات">الإعدادات</span>
         </div>
     </nav>
+
+<!-- Shared datalist for category comboboxes -->
+<datalist id="category-datalist">
+    <option value="مواد غذائية"></option>
+    <option value="إلكترونيات"></option>
+    <option value="وقود"></option>
+    <option value="مطاعم"></option>
+    <option value="مشروبات"></option>
+    <option value="خضروات وفواكه"></option>
+    <option value="منظفات"></option>
+    <option value="مستحضرات"></option>
+    <option value="أخرى"></option>
+</datalist>
 
 <script src="script.js"></script>
 </body>

@@ -175,6 +175,58 @@ body.dark-mode tbody tr:nth-child(even) td { background-color: rgba(255,255,255,
 
 tr:hover td { background-color: rgba(var(--primary-rgb), 0.06) !important; }
 
+/* Receipt-like compact table styles for scanned invoices and manual items */
+.receipt-table {
+    font-family: 'Noto Kufi Arabic', Arial, sans-serif;
+    font-size: 13px;
+    border-collapse: collapse;
+    width: 100%;
+    background: transparent;
+}
+.receipt-table th, .receipt-table td {
+    border: 1px solid rgba(0,0,0,0.08);
+    padding: 8px 6px;
+    vertical-align: middle;
+}
+.receipt-table thead th {
+    background: rgba(0,0,0,0.04);
+    font-weight: 700;
+    font-size: 12px;
+}
+.receipt-table td { color: inherit; }
+.receipt-table td:nth-child(1) { text-align: right; }
+.receipt-table td:nth-child(2), .receipt-table td:nth-child(3) { text-align: center; }
+.receipt-table td:nth-child(4), .receipt-table td:nth-child(5) { text-align: left; }
+
+/* Totals box like on the paper receipt */
+.receipt-total-box {
+    border: 2px dashed rgba(0,0,0,0.12);
+    padding: 10px 12px;
+    border-radius: 10px;
+    display: inline-block;
+    background: rgba(255,255,255,0.02);
+    margin-top: 10px;
+    font-weight: 800;
+    font-size: 20px;
+}
+
+/* make scanned result card match receipt feel */
+.scanned-result-card { padding: 12px; border-radius: 10px; border: 1px solid rgba(0,0,0,0.06); background: #fff; }
+body.dark-mode .scanned-result-card { background: var(--surface-dark); border-color: rgba(255,255,255,0.04); }
+.scanned-items-wrapper { overflow: auto; max-height: 360px; }
+.scanned-table { width:100%; border-collapse: collapse; font-size:13px; }
+.scanned-table th, .scanned-table td { padding:8px 6px; border:1px solid rgba(0,0,0,0.08); }
+.scanned-summary { display:flex; justify-content:flex-end; padding-top:10px; }
+.scanned-total { font-weight:900; font-size:18px; }
+
+/* compact receipts table (archive) when in compact mode */
+#receipts-table.receipt-table { font-size:13px; }
+
+@media (max-width:520px) {
+    .receipt-table th, .receipt-table td { padding:6px 6px; font-size:12px; }
+    .scanned-result-card { padding:10px; }
+}
+
 
 .action-btn { background: transparent; border: none; cursor: pointer; display: inline-flex; align-items: center; margin: 0 4px; padding: 4px; border-radius: 8px; transition: background 0.2s; }
 .edit-btn { color: #16A34A; }
