@@ -69,7 +69,8 @@ body.dark-mode {
 .screen {
     display: none; flex-direction: column;
     flex: 1; overflow-y: auto;
-    padding-bottom: 100px;
+    /* reserve generous safe area for the floating bottom nav / FAB to avoid overlap */
+    padding-bottom: 180px;
     opacity: 0;
     transform: translateY(8px);
     transition: opacity 0.35s ease-out, transform 0.35s ease-out;
@@ -183,7 +184,7 @@ tr:hover td { background-color: rgba(var(--primary-rgb), 0.06) !important; }
 .lock-status-badge { background-color: #ff6b6b; color: #fff; font-size: 11px; padding: 4px 8px; border-radius: 8px; font-weight: bold; }
 
 .bottom-nav {
-    position: fixed; bottom: 12px; left: 12px; right: 12px; height: 72px;
+    position: fixed; bottom: 18px; left: 12px; right: 12px; height: 76px;
     background-color: var(--surface-light); display: flex;
     justify-content: space-around; align-items: center; padding: 0 8px;
     border-radius: 16px; box-shadow: 0 10px 30px rgba(2,6,8,0.6); z-index: 99;
@@ -196,20 +197,27 @@ body.dark-mode .bottom-nav { background-color: #13161c; border-top-color: var(--
 .nav-item.active { color: var(--primary-neon); }
 .nav-item.active .nav-icon { transform: scale(1.1); }
 
-.nav-item-camera-holder { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; cursor: pointer; }
+.nav-item-camera-holder { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; cursor: pointer; gap: 6px; }
 
 #bottom-manual-insert { flex: 1; justify-content: center; }
 #bottom-manual-insert .header-icon-btn { padding: 0; }
 
 .nav-camera-btn {
-    width: 56px; height: 56px; border-radius: 18px;
+    width: 64px; height: 64px; border-radius: 999px;
     background-color: var(--primary-neon); color: #0b0d10;
     border: none; cursor: pointer; display: flex; align-items: center; justify-content: center;
-    box-shadow: 0 10px 26px rgba(var(--primary-rgb), 0.18);
+    box-shadow: 0 14px 36px rgba(var(--primary-rgb), 0.16);
     transition: transform 0.18s ease, box-shadow 0.18s ease;
+    z-index: 110; /* sit above other bottom content */
 }
 .nav-camera-btn:active { transform: scale(0.92); }
 .nav-camera-btn span { font-size: 22px; font-weight: bold; }
+
+/* Ensure the button can host a transparent file input that covers it. This
+    lets mobile browsers treat the interaction as a direct file/camera capture
+    by the user (important for capture="environment"). */
+.nav-camera-btn { position: relative; overflow: hidden; }
+.nav-camera-btn .file-input-cover { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; border: 0; margin: 0; padding: 0; cursor: pointer; }
 
 .modal-overlay {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
@@ -324,7 +332,7 @@ body.dark-mode .recent-item { background: var(--surface-dark); border-color: rgb
 
 body.dark-mode .recent-delete-btn { color: rgba(239,68,68,0.9); }
 
-.settings-list { padding: 16px; }
+.settings-list { padding: 16px; padding-bottom: 240px; }
 .settings-group-title { font-size: 11px; font-weight: 800; color: var(--primary-neon); margin: 12px 8px; letter-spacing: 0.6px; opacity: 0.95; }
 .settings-card { background-color: var(--surface-light); border-radius: 20px; overflow: hidden; margin-bottom: 16px; }
 body.dark-mode .settings-card { background-color: var(--surface-dark); }
@@ -525,7 +533,7 @@ button:focus-visible, [role="button"]:focus-visible { outline: 3px solid rgba(31
 .bottom-nav .nav-camera-btn { transform: translateY(-10px); width: 68px; height: 68px; border-radius: 999px; box-shadow: 0 14px 36px rgba(var(--primary-rgb),0.14); }
 
 /* tighten the vertical spacing between camera and its label */
-.nav-item-camera-holder .nav-label { margin-top: 6px; font-size: 12px; }
+.nav-item-camera-holder .nav-label { margin-top: 4px; font-size: 12px; }
 
 /* Make cards more interactive */
 .recent-item:hover, .settings-card:hover { transform: translateY(-6px); box-shadow: 0 20px 40px rgba(2,6,8,0.08); }
@@ -972,18 +980,19 @@ body.dark-mode html[dir="ltr"] #receipts-table th:nth-child(5), body.dark-mode h
 
 /* Enlarge circular logo for a clearer, professional mark */
 .logo-circle {
-    width: 96px !important;
-    height: 96px !important;
+    /* ~30% larger than original 96px -> ~125px (use 124 for evenness) */
+    width: 124px !important;
+    height: 124px !important;
     padding: 12px !important;
     border-radius: 50% !important;
 }
 
-/* Ensure logo image remains clipped and sharp */
-.app-logo { border-radius: 50% !important; object-fit: cover !important; }
+/* Ensure logo image remains clipped and preserves aspect ratio without stretching */
+.app-logo { border-radius: 50% !important; object-fit: contain !important; width:100% !important; height:100% !important; }
 
 @media (max-width: 520px) {
     .app-title { font-size: 22px !important; }
-    .logo-circle { width: 72px !important; height: 72px !important; padding: 8px !important; }
+    .logo-circle { width: 86px !important; height: 86px !important; padding: 8px !important; }
 }
 
 

@@ -216,10 +216,30 @@
                 </div>
                 <button type="submit" class="form-submit-btn neon-glow lang-text" data-en="Save Invoice" data-ar="حفظ الفاتورة">حفظ الفاتورة</button>
             </form>
+            <!-- Dynamic invoice items region: populated after OCR/AI extraction -->
+            <div id="invoice-items-region" class="invoice-items-region" style="display:none; margin-top:16px;">
+                <h4 class="lang-text" data-en="Items" data-ar="البنود">البنود</h4>
+                <div style="overflow:auto; max-height:220px;">
+                    <table id="invoice-items-table" style="width:100%; border-collapse:collapse;">
+                        <thead>
+                            <tr>
+                                <th style="text-align:right; padding:8px;">الوصف</th>
+                                <th style="text-align:center; padding:8px;">الكمية</th>
+                                <th style="text-align:center; padding:8px;">سعر الوحدة</th>
+                                <th style="text-align:left; padding:8px;">المجموع</th>
+                            </tr>
+                        </thead>
+                        <tbody id="invoice-items-tbody"></tbody>
+                    </table>
+                </div>
+                <div id="invoice-items-total" style="margin-top:8px; font-weight:700; text-align:left;"></div>
+            </div>
         </div>
     </div>
 
-    <input type="file" id="scan-invoice-file-input" accept="image/*" capture="environment" style="display:none;">
+        <!-- moved file input into the camera button so mobile browsers treat the click
+            as a direct user gesture and honor capture="environment" to open the
+            back camera instead of the file picker. -->
 
     <div id="screen-camera-view" class="camera-overlay">
 
@@ -255,6 +275,7 @@
         <div class="nav-item-camera-holder" role="button" tabindex="0">
             <button class="nav-camera-btn" id="trigger-ocr-btn">
                 <span class="material-symbols-rounded">photo_camera</span>
+                <input class="file-input-cover" type="file" id="scan-invoice-file-input" accept="image/*" capture="environment" aria-label="التقاط صورة الفاتورة" />
             </button>
             <span class="nav-label lang-text" data-en="Scan" data-ar="مسح الفاتورة">مسح الفاتورة</span>
         </div>

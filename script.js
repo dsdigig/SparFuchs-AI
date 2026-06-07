@@ -250,6 +250,95 @@
         clearDataBtn: document.getElementById("clear-data-btn")
     };
 
+    // Helper: convert File/Blob -> Base64 (returns base64 string without data: prefix)
+    function fileToBase64(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onerror = () => reject(new Error('FileReader failed'));
+            reader.onload = () => {
+                const result = reader.result || '';
+                // result is like 'data:image/jpeg;base64,/9j/4AAQ...'
+                const parts = String(result).split(',');
+                resolve(parts[1] || '');
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+
+        // Dynamic invoice items rendering
+        function clearInvoiceItems() {
+            const region = document.getElementById('invoice-items-region');
+            const tbody = document.getElementById('invoice-items-tbody');
+            const totalEl = document.getElementById('invoice-items-total');
+            if (tbody) tbody.innerHTML = '';
+            if (totalEl) totalEl.textContent = '';
+            if (region) region.style.display = 'none';
+        }
+
+        function renderInvoiceItems(items) {
+            const region = document.getElementById('invoice-items-region');
+            const tbody = document.getElementById('invoice-items-tbody');
+            const totalEl = document.getElementById('invoice-items-total');
+            if (!items || !items.length) {
+                clearInvoiceItems();
+                return;
+            }
+            if (tbody) {
+                tbody.innerHTML = '';
+                items.forEach(it => {
+                    const tr = document.createElement('tr');
+                    const nameTd = document.createElement('td');
+                    const qtyTd = document.createElement('td');
+                    const unitTd = document.createElement('td');
+                    const totalTd = document.createElement('td');
+
+                    nameTd.style.padding = '8px'; nameTd.style.textAlign = 'right';
+                    qtyTd.style.padding = '8px'; qtyTd.style.textAlign = 'center';
+                    unitTd.style.padding = '8px'; unitTd.style.textAlign = 'center';
+                    totalTd.style.padding = '8px'; totalTd.style.textAlign = 'left';
+
+                    nameTd.textContent = it.name || '';
+                    qtyTd.textContent = (typeof it.quantity !== 'undefined' && it.quantity !== null) ? String(it.quantity) : '';
+                    unitTd.textContent = (typeof it.unit_price !== 'undefined' && it.unit_price !== null) ? Number(it.unit_price).toFixed(2) : '';
+                    totalTd.textContent = (typeof it.total_price !== 'undefined' && it.total_price !== null) ? Number(it.total_price).toFixed(2) : '';
+
+                    tr.appendChild(nameTd);
+                    tr.appendChild(qtyTd);
+                    tr.appendChild(unitTd);
+                    tr.appendChild(totalTd);
+                    tbody.appendChild(tr);
+                });
+            }
+            if (totalEl) {
+                // compute sum if not provided
+                const sum = items.reduce((s,it) => s + (Number(it.total_price) || 0), 0);
+                totalEl.textContent = 'المجموع: ' + sum.toFixed(2);
+            }
+            if (region) region.style.display = '';
+        }
+
+    // When user picks/captures an image via native input, convert immediately to Base64
+    if (selectors.scanInvoiceFileInput) {
+        selectors.scanInvoiceFileInput.addEventListener('change', async (ev) => {
+            const input = ev.target;
+            if (!input || !input.files || !input.files.length) return;
+            const file = input.files[0];
+            try {
+                const base64 = await fileToBase64(file);
+                // attach base64 string to file object for downstream use (and call OCR)
+                file.base64 = base64;
+                // processInvoice expects a File/Blob — keep existing OCR pipeline
+                await processInvoice(file);
+                // Optionally: you may send `base64` to your AI server here.
+            } catch (err) {
+                console.error('Failed to convert captured image to Base64:', err);
+            } finally {
+                // reset value so same file can be selected again
+                try { input.value = ''; } catch {}
+            }
+        });
+    }
+
     // additional controls (search / filters) - may be null on first load
     selectors.tableSearch = document.getElementById('table-search');
     selectors.filterMonth = document.getElementById('filter-month');
@@ -456,25 +545,68 @@
             return;
         }
 
+        // Try multiple strategies to reliably open the back camera across devices/browsers
+        async function tryGetUserMedia(constraints) {
+            try {
+                return await navigator.mediaDevices.getUserMedia(constraints);
+            } catch (err) {
+                return null;
+            }
+        }
+
         try {
             if (selectors.cameraOverlay) selectors.cameraOverlay.style.display = 'flex';
             showOcrMessage(isEn ? 'Starting camera...' : 'جاري تشغيل الكاميرا...');
-            cameraStream = await navigator.mediaDevices.getUserMedia({
-                video: {
-                    facingMode: { ideal: 'environment' },
-                    width: { ideal: 1920 },
-                    height: { ideal: 1080 }
-                },
-                audio: false
-            });
 
+            // 1) Try strict back camera (may throw if not supported)
+            cameraStream = await tryGetUserMedia({ video: { facingMode: { exact: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false });
+
+            // 2) If strict failed, try ideal facingMode
+            if (!cameraStream) {
+                cameraStream = await tryGetUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
+            }
+
+            // 3) If still no stream, try to enumerate video input devices and pick a likely rear camera
+            if (!cameraStream && navigator.mediaDevices && typeof navigator.mediaDevices.enumerateDevices === 'function') {
+                try {
+                    const devices = await navigator.mediaDevices.enumerateDevices();
+                    const videoInputs = devices.filter(d => d.kind === 'videoinput');
+                    // heuristic: choose last device (often rear camera) or any device whose label contains 'back'/'rear'
+                    let chosen = null;
+                    for (const d of videoInputs) {
+                        const label = (d.label || '').toLowerCase();
+                        if (label.includes('back') || label.includes('rear') || label.includes('environment')) { chosen = d; break; }
+                    }
+                    if (!chosen && videoInputs.length) chosen = videoInputs[videoInputs.length - 1];
+                    if (chosen) {
+                        cameraStream = await tryGetUserMedia({ video: { deviceId: { exact: chosen.deviceId }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
+                    }
+                } catch (enumErr) {
+                    console.warn('enumerateDevices failed or returned no usable video inputs', enumErr);
+                }
+            }
+
+            // 4) If still not available, fallback to native file input
+            if (!cameraStream) {
+                stopCameraStream();
+                if (selectors.scanInvoiceFileInput) {
+                    selectors.scanInvoiceFileInput.value = '';
+                    selectors.scanInvoiceFileInput.click();
+                    showOcrMessage(isEn ? 'Opening file picker...' : 'فتح منتقي الملفات...');
+                } else {
+                    alert(isEn ? 'Camera is unavailable or permission was denied.' : 'الكاميرا غير متاحة أو تم رفض الصلاحية.');
+                }
+                return;
+            }
+
+            // attach stream to video element
             if (selectors.cameraVideo) {
                 selectors.cameraVideo.srcObject = cameraStream;
                 await selectors.cameraVideo.play();
             }
             showOcrMessage(isEn ? 'Align the invoice and capture.' : 'وجّه الكاميرا نحو الفاتورة ثم التقط الصورة.');
         } catch (e) {
-            console.error('Camera permission/start failed:', e);
+            console.error('Camera permission/start failed (unexpected):', e);
             stopCameraStream();
             if (selectors.scanInvoiceFileInput) {
                 selectors.scanInvoiceFileInput.value = '';
@@ -511,17 +643,39 @@
 
     if (selectors.triggerOcrBtn) {
         selectors.triggerOcrBtn.addEventListener('click', (e) => {
+            // If the embedded file input was clicked, allow native behavior to continue
+            if (e.target && (e.target.tagName === 'INPUT' || e.target.id === 'scan-invoice-file-input')) {
+                return;
+            }
             e.preventDefault();
             e.stopPropagation();
-            // On mobile open camera directly; on desktop open file picker
+            // Prefer opening the in-app camera via getUserMedia on mobile devices.
             if (isMobileDevice()) {
+                if (navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function') {
+                    // Try the in-app camera overlay first (more reliable for direct capture)
+                    openCameraScanner();
+                    return;
+                }
+
+                // Fallback: try the native file input (capture attribute)
+                if (selectors.scanInvoiceFileInput) {
+                    try {
+                        selectors.scanInvoiceFileInput.value = '';
+                        selectors.scanInvoiceFileInput.click();
+                        return;
+                    } catch (err) {
+                        console.warn('native file input camera trigger failed, falling back to overlay', err);
+                    }
+                }
+
+                // Last resort: open overlay
                 openCameraScanner();
             } else {
+                // Desktop: open file picker first, fallback to camera overlay
                 if (selectors.scanInvoiceFileInput) {
                     selectors.scanInvoiceFileInput.value = '';
                     selectors.scanInvoiceFileInput.click();
                 } else {
-                    // fallback
                     openCameraScanner();
                 }
             }
@@ -685,10 +839,138 @@
         if (selectors.formDate) selectors.formDate.value = data.date || new Date().toISOString().split('T')[0];
     }
 
-    async function processInvoice(file) {
+    async function processInvoice(input) {
         const isEn = document.documentElement.getAttribute('lang') === 'en';
+
+        // Config: replace with your actual AI endpoint and optional API key
+        const AI_ENDPOINT = window.SPARFUCHS_AI_ENDPOINT || ''; // e.g. 'https://your-ai-server.example/api/vision'
+        const AI_API_KEY = window.SPARFUCHS_AI_KEY || '';
+
+                // Prompt required by the user (sent to the AI)
+                // Instruct the model to always return strict JSON with items array when available.
+                const AI_PROMPT = `أنت نظام رؤية حاسوبية ذكي لتطبيق SparFuchs AI. حلل صورة الفاتورة المرفقة ديناميكياً وتوافق مع تصميم الجدول أو النصوص الخاص بها أياً كان شكلها. استخرج بدقة عالية وأعد JSON حصرياً وبدون شرح جانبي، الصيغة التالية:
+{
+    "bill_name": "اسم المتجر أو الفاتورة",
+    "total_amount": 0.00,             // رقم عشري نظيف بدون فواصل
+    "currency": "رمز العملة مثل SYP أو USD",
+    "date": "YYYY-MM-DD",
+    "items": [                         // إن وُجدت بنود مفصلة، أعد مصفوفة بنود
+        { "name": "اسم البند", "quantity": 1, "unit_price": 0.00, "total_price": 0.00 }
+    ]
+}`;
+
+        function blobToBase64(blob) {
+            return new Promise((resolve, reject) => {
+                try {
+                    const reader = new FileReader();
+                    reader.onerror = () => reject(new Error('FileReader failed'));
+                    reader.onload = () => {
+                        const parts = String(reader.result || '').split(',');
+                        resolve(parts[1] || '');
+                    };
+                    reader.readAsDataURL(blob);
+                } catch (err) { reject(err); }
+            });
+        }
+
+        async function sendBase64ToAiAndPopulate(base64) {
+            try {
+                if (!AI_ENDPOINT) {
+                    console.warn('AI_ENDPOINT not configured — skipping AI POST.');
+                    return null;
+                }
+
+                showOcrMessage(isEn ? 'Sending image to AI...' : 'إرسال الصورة إلى خادم الذكاء الاصطناعي...');
+
+                const payload = {
+                    prompt: AI_PROMPT,
+                    image_base64: base64
+                };
+
+                const headers = { 'Content-Type': 'application/json' };
+                if (AI_API_KEY) headers['Authorization'] = 'Bearer ' + AI_API_KEY;
+
+                const res = await fetch(AI_ENDPOINT, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify(payload)
+                });
+
+                if (!res.ok) {
+                    const txt = await res.text().catch(()=>null);
+                    console.warn('AI server returned non-OK:', res.status, txt);
+                    return null;
+                }
+
+                const json = await res.json().catch(() => null);
+                console.log('AI response raw:', json);
+
+                // Try to find the JSON payload in common shapes
+                const aiResult = (json && (json.data || json.result || json.output || json)) || null;
+                const parsed = aiResult && typeof aiResult === 'object' ? aiResult : null;
+
+                // If parsed contains wrapper fields (e.g., choices[0].text), attempt to parse text
+                let final = null;
+                if (!parsed && json && json.choices && Array.isArray(json.choices) && json.choices[0]) {
+                    try { final = JSON.parse(json.choices[0].text); } catch { final = null; }
+                } else if (parsed && parsed.bill_name) {
+                    final = parsed;
+                } else if (json && typeof json === 'string') {
+                    try { final = JSON.parse(json); } catch {}
+                }
+
+                if (!final) {
+                    // best-effort: search for JSON-like string in response
+                    const asText = JSON.stringify(json || {}).replace(/\\\n/g,'');
+                    try {
+                        const match = asText.match(/\{\s*"bill_name"[\s\S]*\}/);
+                        if (match) final = JSON.parse(match[0]);
+                    } catch (e) { final = null; }
+                }
+
+                if (final) {
+                    console.log('Parsed AI invoice result:', final);
+
+                    // Fill fields safely
+                    if (selectors.formName && final.bill_name) selectors.formName.value = final.bill_name;
+                    if (selectors.formAmount && typeof final.total_amount !== 'undefined' && final.total_amount !== null) {
+                        const amt = Number(final.total_amount);
+                        if (Number.isFinite(amt)) {
+                            selectors.formAmount.dataset.rawValue = amt.toFixed(2);
+                            selectors.formAmount.value = Number(amt).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+                        }
+                    }
+                    if (selectors.formCurrency && final.currency) selectors.formCurrency.value = final.currency;
+                    if (selectors.formDate && final.date) selectors.formDate.value = final.date;
+
+                    // Render dynamic items if present
+                    if (Array.isArray(final.items) && final.items.length) {
+                        renderInvoiceItems(final.items);
+                    } else {
+                        clearInvoiceItems();
+                    }
+
+                    showOcrMessage(isEn ? 'AI result applied.' : 'تم تطبيق نتيجة الذكاء الاصطناعي.');
+                    return final;
+                }
+
+                showOcrMessage(isEn ? 'AI did not return structured JSON.' : 'لم يرجع الذكاء الاصطناعي JSON منسق.');
+                return null;
+            } catch (err) {
+                console.error('sendBase64ToAiAndPopulate error:', err);
+                return null;
+            }
+        }
+
         try {
-            if (!file) return;
+            if (!input) return;
+
+            // If caller passed a base64 string directly
+            if (typeof input === 'string') {
+                await sendBase64ToAiAndPopulate(input);
+                return;
+            }
+
             if (typeof Tesseract === 'undefined') {
                 alert(isEn ? 'OCR library not loaded.' : 'مكتبة OCR غير محمّلة.');
                 return;
@@ -696,11 +978,18 @@
 
             showOcrMessage(isEn ? 'Processing invoice...' : 'جاري تحليل الفاتورة...');
 
-            // Resize image for speed
-            const imgBitmap = await createImageBitmap(file).catch(() => null);
+            // Try to create an ImageBitmap for resizing
+            const imgBitmap = await createImageBitmap(input).catch(() => null);
             if (!imgBitmap) {
-                // Fallback: use file directly
-                imgBitmapFromFileFallback();
+                // fallback: run OCR on original blob/file and also send to AI
+                const result = await Tesseract.recognize(input, 'ara+eng');
+                const text = result?.data?.text || '';
+                fillInvoiceReview(extractInvoiceDataFromText(text));
+                try {
+                    const b64 = await blobToBase64(input);
+                    await sendBase64ToAiAndPopulate(b64);
+                } catch (err) { console.warn('AI send fallback failed', err); }
+                showOcrMessage(isEn ? 'Done. Review extracted data.' : 'تم. راجع البيانات المستخرجة.');
                 return;
             }
 
@@ -712,8 +1001,8 @@
             const ctx = canvas.getContext('2d');
             ctx.drawImage(imgBitmap, 0, 0, canvas.width, canvas.height);
 
-            const resizedBlob = await new Promise((resolve) => canvas.toBlob(resolve, file.type || 'image/jpeg', 0.92));
-            const inputForTesseract = resizedBlob || file;
+            const resizedBlob = await new Promise((resolve) => canvas.toBlob(resolve, input.type || 'image/jpeg', 0.92));
+            const inputForTesseract = resizedBlob || input;
 
             const result = await Tesseract.recognize(inputForTesseract, 'ara+eng', {
                 logger: () => { /* progress UI could be added later */ }
@@ -721,85 +1010,19 @@
 
             const text = (result && result.data && result.data.text) ? result.data.text : '';
             fillInvoiceReview(extractInvoiceDataFromText(text));
-            showOcrMessage(isEn ? 'Done. Review extracted data.' : 'تم. راجع البيانات المستخرجة.');
-            return;
 
-            // Extract total amount (supports Arabic/Western numbers with separators)
-            // Examples: 1,234.56 or 1234.56 or ١٢٣٤٫٥٦
-            const amountRegex = /(?:total\s*[:\u0660-\u0669]*|\b(?:amount|total)\b\s*[:\s]*)([\d.,]+|[\u0660-\u0669\u066b\u066c\.\,]+)/i;
-            const amountRegexAlt = /([\d]{1,3}(?:[\d,]*[\d])(?:\.[\d]{1,2})?|[\d]+(?:\.[\d]{1,2})?)/;
-
-            // Extract date (YYYY-MM-DD or DD/MM/YYYY or DD-MM-YYYY)
-            const dateRegex = /(?:\b(\d{4}[-\/.]\d{1,2}[-\/.]\d{1,2})\b|\b(\d{1,2}[-\/.]\d{1,2}[-\/.]\d{4})\b)/;
-
-            let extractedAmount = null;
-            let extractedDate = null;
-
-            const amountMatch = text.match(amountRegex) || text.match(amountRegexAlt);
-            if (amountMatch && amountMatch[1]) {
-                extractedAmount = amountMatch[1];
-            }
-
-            const dateMatch = text.match(dateRegex);
-            if (dateMatch) {
-                extractedDate = dateMatch[1] || dateMatch[2] || null;
-            }
-
-            // Normalize amount: keep digits and decimal dot.
-            if (extractedAmount) {
-                const normalized = String(extractedAmount)
-                    .replace(/\s/g, '')
-                    .replace(/[\u0660-\u0669]/g, d => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))
-                    .replace(/,/g, '')
-                    .replace(/\u066b|\u066c/g, '.');
-                const asNumber = parseFloat(normalized);
-                if (!Number.isNaN(asNumber)) {
-                    if (selectors.formAmount) selectors.formAmount.value = asNumber.toFixed(2);
-                }
-            }
-
-            // Normalize date to yyyy-mm-dd
-            if (extractedDate && selectors.formDate) {
-                const raw = String(extractedDate).trim();
-                let iso = raw;
-                if (/^\d{4}[-\/.]\d{1,2}[-\/.]\d{1,2}$/.test(raw)) {
-                    iso = raw.replaceAll('/', '-').replaceAll('.', '-');
-                } else {
-                    const parts = raw.replaceAll('/', '-').replaceAll('.', '-').split('-');
-                    if (parts.length === 3) {
-                        const [a,b,c] = parts;
-                        // assume DD-MM-YYYY
-                        iso = `${c}-${b.padStart(2,'0')}-${a.padStart(2,'0')}`;
-                    }
-                }
-                selectors.formDate.value = iso;
+            // Also send to AI for structured extraction and populate fields if available
+            try {
+                const b64 = await blobToBase64(inputForTesseract || input);
+                await sendBase64ToAiAndPopulate(b64);
+            } catch (err) {
+                console.warn('AI send failed:', err);
             }
 
             showOcrMessage(isEn ? 'Done. Review extracted data.' : 'تم. راجع البيانات المستخرجة.');
         } catch (e) {
             console.error('processInvoice error:', e);
             alert((document.documentElement.getAttribute('lang') === 'en') ? 'OCR failed.' : 'فشل تحليل OCR.');
-        }
-
-        function imgBitmapFromFileFallback() {
-            (async () => {
-                try {
-                    showOcrMessage(isEn ? 'Processing invoice...' : 'جاري تحليل الفاتورة...');
-                    const result = await Tesseract.recognize(file, 'ara+eng');
-                    const text = result?.data?.text || '';
-                    fillInvoiceReview(extractInvoiceDataFromText(text));
-                    showOcrMessage(isEn ? 'Done. Review extracted data.' : 'تم. راجع البيانات المستخرجة.');
-                    return;
-                    const amountMatch = text.match(/([\d.,]+)(?!.*\1)/);
-                    const dateMatch = text.match(/(\d{4}[-\/.]\d{1,2}[-\/.]\d{1,2})|(\d{1,2}[-\/.]\d{1,2}[-\/.]\d{4})/);
-                    if (amountMatch && selectors.formAmount) selectors.formAmount.value = parseFloat(String(amountMatch[1]).replace(/,/g,'')).toFixed(2);
-                    if (dateMatch && selectors.formDate) selectors.formDate.value = (dateMatch[1] || dateMatch[2]).replaceAll('/', '-').replaceAll('.', '-');
-                    showOcrMessage(isEn ? 'Done. Review extracted data.' : 'تم. راجع البيانات المستخرجة.');
-                } catch (err) {
-                    console.error(err);
-                    alert((document.documentElement.getAttribute('lang') === 'en') ? 'OCR failed.' : 'فشل تحليل OCR.');
-                }
-            })();
         }
     }
 
